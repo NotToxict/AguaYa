@@ -1,0 +1,1 @@
+if('serviceWorker' in navigator) navigator.serviceWorker.register('/AguaYaa/dev-sw.js?dev-sw', { scope: '/AguaYaa/', type: 'classic' })
