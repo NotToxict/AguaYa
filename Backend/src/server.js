@@ -10,6 +10,7 @@ const admin = require('./config/firebase');
 const storeRoutes = require('./routes/storeRoutes');
 const authRoutes = require('./routes/authRoutes');
 const localRoutes = require('./routes/localRoutes'); // <--- La de empleados
+const orderRoutes = require('./routes/orderRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -18,6 +19,7 @@ const PORT = process.env.PORT || 3001;
 app.use(cors()); // Permite conexiones externas
 app.use(express.json()); // Permite leer JSON en las peticiones
 app.use(express.urlencoded({ extended: true }));
+app.use('/api/orders', orderRoutes);
 
 // --- Ruta de Prueba (Ping) ---
 app.get('/', (req, res) => {

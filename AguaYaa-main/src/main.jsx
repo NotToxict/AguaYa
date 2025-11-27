@@ -28,6 +28,7 @@ import LocalDashboardPage from "./pages/local/LocalDashboardPage.jsx";
 import LocalProductsPage from "./pages/local/LocalProductsPage.jsx";
 import LocalEmployeesPage from "./pages/local/LocalEmployeesPage.jsx"; // <--- 1. IMPORTAR NUEVA PÁGINA
 import DeliveryDashboardPage from "./pages/delivery/DeliveryDashboardPage.jsx";
+import StoreDetailsPage from "./pages/StoreDetailsPage.jsx";
 
 // Wrapper de providers QUE VAN DENTRO del Router (para que useNavigate funcione)
 function AppProviders() {
@@ -74,6 +75,7 @@ const router = createBrowserRouter(
             { path: "contact", element: <ContactPage /> },
             { path: "cart", element: <CartPage /> },
             { path: "checkout", element: <CheckoutPage /> },
+            { path: "store/:id", element: <StoreDetailsPage /> },
           ],
         },
 

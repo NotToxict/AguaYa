@@ -1,97 +1,114 @@
 import React from 'react';
 import {
-  Box,
-  Button,
-  Card,
-  CardActions,
-  CardContent,
-  Container,
-  Grid,
-  Rating,
-  Typography,
-  CircularProgress, // <-- Importa CircularProgress
-  Alert, // <-- Importa Alert
+  Box, Button, Card, CardActions, CardContent, CardMedia,
+  Container, Grid, Rating, Typography, CircularProgress, Alert
 } from '@mui/material';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import StorefrontIcon from '@mui/icons-material/Storefront';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../context/StoreContext';
 import { useCart } from '../context/CartContext';
 
 export default function StoresPage() {
-  // Obtiene loading, error y stores del contexto actualizado
   const { stores, setStoreId, storeId, loading, error } = useStore();
   const { items, clear } = useCart();
   const navigate = useNavigate();
 
   const handleSelect = (id) => {
-    const numericId = parseInt(id, 10); // Asegura que el ID sea número
+    const numericId = parseInt(id, 10);
     const switching = storeId !== null && storeId !== numericId;
     const hasCart = items.length > 0;
 
     if (switching && hasCart) {
-      // Usamos un modal/dialogo custom si 'confirm' no funciona bien en iframes
       const ok = window.confirm('Cambiar de tienda vaciará tu carrito. ¿Continuar?');
       if (!ok) return;
       clear();
     }
-    setStoreId(numericId); // Guarda el ID numérico
-    navigate('/catalog');
+    
+    setStoreId(numericId);
+    // CORRECCIÓN IMPORTANTE: Navegar a la página de detalle que creamos antes
+    navigate(`/store/${numericId}`); 
   };
 
   return (
-    <Container maxWidth="lg" sx={{ mt: 6, mb: { xs: 10, md: 6 } }}>
-      <Typography variant="h4" component="h1" sx={{ mb: 2 }}>
-        Tiendas cercanas
+    <Container maxWidth="lg" sx={{ mt: 4, mb: 8 }}>
+      <Typography variant="h4" component="h1" sx={{ mb: 3, fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1 }}>
+        <StorefrontIcon fontSize="large" color="primary" /> Tiendas Disponibles
       </Typography>
 
-      {/* --- Indicador de Carga --- */}
+      {/* Indicador de Carga */}
       {loading && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', my: 5 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'center', my: 10 }}>
           <CircularProgress />
         </Box>
       )}
 
-      {/* --- Mensaje de Error --- */}
+      {/* Mensaje de Error */}
       {error && !loading && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
+        <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>
       )}
 
-      {/* --- Lista de Tiendas (solo si no hay carga ni error) --- */}
+      {/* Lista Vacía */}
       {!loading && !error && stores.length === 0 && (
-          <Typography color="text.secondary">No hay tiendas disponibles por el momento.</Typography>
+        <Paper sx={{ p: 4, textAlign: 'center' }}>
+          <Typography color="text.secondary">No hay tiendas activas en este momento.</Typography>
+        </Paper>
       )}
 
+      {/* Grilla de Tiendas */}
       {!loading && !error && stores.length > 0 && (
-        <Grid container spacing={2}>
+        <Grid container spacing={3}>
           {stores.map((s) => (
             <Grid item key={s.id} xs={12} sm={6} md={4}>
-              <Card>
-                <CardContent>
-                  <Typography variant="h6" fontWeight={700}>{s.name}</Typography>
-                  {/* Rating y ETA (Asegúrate que los nombres de props coincidan con el mapeo en StoreContext) */}
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1, color: 'text.secondary' }}>
-                    <Rating value={s.rating || 0} precision={0.1} readOnly size="small" />
-                    <Typography variant="body2">{(s.rating || 0).toFixed(1)}</Typography>
+              <Card elevation={3} sx={{ height: '100%', display: 'flex', flexDirection: 'column', transition: '0.3s', '&:hover': { transform: 'translateY(-4px)', boxShadow: 6 } }}>
+                
+                {/* IMAGEN DE LA TIENDA (Si tiene) */}
+                {s.imageUrl ? (
+                  <CardMedia
+                    component="img"
+                    height="140"
+                    image={s.imageUrl}
+                    alt={s.name}
+                  />
+                ) : (
+                  <Box sx={{ height: 140, bgcolor: 'primary.light', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <StorefrontIcon sx={{ fontSize: 60, color: 'white', opacity: 0.5 }} />
                   </Box>
-                  <Box sx={{ display: 'flex', gap: 2, mt: 1.5, color: 'text.secondary' }}>
+                )}
+
+                <CardContent sx={{ flexGrow: 1 }}>
+                  <Typography variant="h6" fontWeight={700} gutterBottom>
+                    {s.name}
+                  </Typography>
+                  
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                    <Rating value={s.rating || 0} precision={0.5} readOnly size="small" />
+                    <Typography variant="body2" color="text.secondary">
+                      ({s.rating ? s.rating.toFixed(1) : 'Nuevo'})
+                    </Typography>
+                  </Box>
+
+                  <Box sx={{ display: 'flex', gap: 2, color: 'text.secondary' }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      <AccessTimeIcon fontSize="small" />
-                      {/* Usa etaMin mapeado */}
+                      <AccessTimeIcon fontSize="small" color="action" />
                       <Typography variant="body2">{s.etaMin} min</Typography>
                     </Box>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      <LocalShippingIcon fontSize="small" />
-                      {/* Usa deliveryFee mapeado */}
-                      <Typography variant="body2">Envío ${s.deliveryFee}</Typography>
+                      <LocalShippingIcon fontSize="small" color="action" />
+                      <Typography variant="body2">${s.deliveryFee}</Typography>
                     </Box>
                   </Box>
                 </CardContent>
-                <CardActions sx={{ px: 2, pb: 2 }}>
-                  <Button fullWidth variant="contained" onClick={() => handleSelect(s.id)}>
-                    Entrar a la tienda
+
+                <CardActions sx={{ p: 2, pt: 0 }}>
+                  <Button 
+                    fullWidth 
+                    variant="contained" 
+                    onClick={() => handleSelect(s.id)}
+                    endIcon={<StorefrontIcon />}
+                  >
+                    Ver Productos
                   </Button>
                 </CardActions>
               </Card>

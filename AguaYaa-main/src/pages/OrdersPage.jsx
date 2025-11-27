@@ -1,110 +1,119 @@
-import React, { useState, useEffect } from 'react'; // Añadir useState, useEffect
+import React, { useEffect, useState } from 'react';
 import {
-  Container,
-  Typography,
-  Box, // Añadir Box
-  CircularProgress, // Añadir CircularProgress
-  Alert, // Añadir Alert
-  List, // Añadir List
-  ListItem, // Añadir ListItem
-  ListItemText, // Añadir ListItemText
-  Divider, // Añadir Divider
-  Chip, // Añadir Chip
+  Container, Typography, Paper, Box, Chip, Button, 
+  CircularProgress, Grid, Divider
 } from '@mui/material';
-import { fetchOrders } from '../services/storeService'; // <-- Importar el servicio
-import { formatCurrency } from '../utils/format'; // Para formatear el total
-
-// Mapeo simple de estados a colores de Chip (puedes ajustar)
-const statusColors = {
-  'Entregado': 'success',
-  'En Ruta': 'info',
-  'Pendiente': 'warning',
-  'Cancelado': 'error',
-};
+import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
+import { useAuth } from '../context/AuthContext';
+import { formatCurrency } from '../utils/format'; // Asegúrate de tener esta utilidad o usa una simple
 
 export default function OrdersPage() {
-  // Estados para pedidos, carga y error
+  const { user } = useAuth();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
 
-  // Efecto para cargar los pedidos al montar
   useEffect(() => {
-    setLoading(true);
-    setError(null);
-    fetchOrders() // Podrías pasar un ID de usuario si tuvieras autenticación real
-      .then((data) => {
+    if (user?.uid) {
+      fetchOrders();
+    }
+  }, [user]);
+
+  const fetchOrders = async () => {
+    try {
+      // Petición al Backend usando el UID de Firebase
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/orders/user/${user.uid}`);
+      const data = await res.json();
+      
+      if (Array.isArray(data)) {
         setOrders(data);
-      })
-      .catch((err) => {
-        console.error("Error al cargar pedidos:", err);
-        setError("No se pudieron cargar tus pedidos. Intenta de nuevo más tarde.");
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }, []); // Cargar solo al montar
+      }
+    } catch (error) {
+      console.error("Error cargando pedidos:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Función para asignar color según el estado
+  const getStatusColor = (status) => {
+    const colors = {
+      pending: 'warning',    // Pendiente (Naranja)
+      accepted: 'info',      // Aceptado (Azul)
+      preparing: 'info',     // Preparando (Azul)
+      on_route: 'primary',   // En camino (Morado/Principal)
+      delivered: 'success',  // Entregado (Verde)
+      cancelled: 'error'     // Cancelado (Rojo)
+    };
+    return colors[status] || 'default';
+  };
+
+  // Función para traducir el estado
+  const getStatusLabel = (status) => {
+    const labels = {
+      pending: 'Pendiente',
+      accepted: 'Aceptado',
+      preparing: 'Preparando',
+      on_route: 'En Camino',
+      delivered: 'Entregado',
+      cancelled: 'Cancelado'
+    };
+    return labels[status] || status;
+  };
+
+  if (loading) {
+    return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 10 }}><CircularProgress /></Box>;
+  }
 
   return (
-    <Container maxWidth="md" sx={{ mt: 6, mb: { xs: 10, md: 6 } }}> {/* Añadido margen inferior */}
-      <Typography variant="h4" component="h1" sx={{ mb: 3 }}> {/* Aumentado margen inferior */}
-        Mis pedidos
+    <Container maxWidth="md" sx={{ mt: 4, mb: 8 }}>
+      <Typography variant="h4" sx={{ mb: 4, fontWeight: 'bold' }}>
+        Mis Pedidos 📦
       </Typography>
 
-      {/* Indicador de Carga */}
-      {loading && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
-          <CircularProgress />
-        </Box>
-      )}
+      {orders.length === 0 ? (
+        <Paper sx={{ p: 4, textAlign: 'center', bgcolor: '#f5f5f5' }}>
+          <ReceiptLongIcon sx={{ fontSize: 60, color: 'text.disabled', mb: 2 }} />
+          <Typography color="text.secondary">Aún no has realizado pedidos.</Typography>
+        </Paper>
+      ) : (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {orders.map((order) => (
+            <Paper key={order.order_id} sx={{ p: 3, borderRadius: 2, boxShadow: 2 }}>
+              <Grid container spacing={2} alignItems="center">
+                
+                {/* INFO PRINCIPAL */}
+                <Grid item xs={12} sm={8}>
+                  <Typography variant="h6" fontWeight="bold">
+                    {order.local_name} {/* Nombre de la tienda (viene del JOIN en el backend) */}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {new Date(order.created_at).toLocaleDateString()} • {new Date(order.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                  </Typography>
+                  <Typography variant="body2" sx={{ mt: 1 }}>
+                    📍 {order.delivery_address}
+                  </Typography>
+                </Grid>
 
-      {/* Mensaje de Error */}
-      {error && !loading && (
-        <Alert severity="error" sx={{ my: 2 }}>
-          {error}
-        </Alert>
-      )}
+                {/* ESTADO Y PRECIO */}
+                <Grid item xs={12} sm={4} sx={{ textAlign: { sm: 'right' } }}>
+                  <Chip 
+                    label={getStatusLabel(order.status)} 
+                    color={getStatusColor(order.status)} 
+                    variant="outlined" 
+                    size="small" 
+                    sx={{ mb: 1, fontWeight: 'bold' }}
+                  />
+                  <Typography variant="h5" color="primary.main" fontWeight="bold">
+                    ${parseFloat(order.total).toFixed(2)}
+                  </Typography>
+                </Grid>
 
-      {/* Mensaje si no hay pedidos (después de cargar y sin error) */}
-      {!loading && !error && orders.length === 0 && (
-        <Typography color="text.secondary" sx={{ mt: 2 }}>
-          Aún no tienes pedidos registrados.
-        </Typography>
-      )}
-
-      {/* Lista de Pedidos (si no carga, no hay error y hay pedidos) */}
-      {!loading && !error && orders.length > 0 && (
-        <List sx={{ bgcolor: 'background.paper', borderRadius: 1 }}>
-          {orders.map((order, index) => (
-            <React.Fragment key={order.id}>
-              <ListItem alignItems="flex-start">
-                <ListItemText
-                  primary={`Pedido #${order.id} - ${new Date(order.date).toLocaleDateString()}`}
-                  secondary={
-                    <>
-                      <Typography
-                        component="span"
-                        variant="body2"
-                        color="text.primary"
-                        sx={{ display: 'block' }} // Para que ocupe su línea
-                      >
-                        Total: {formatCurrency(order.total)}
-                      </Typography>
-                      {/* Podrías listar los items aquí si quisieras */}
-                      {/* {order.items.map(item => `${item.qty}x ${item.name}`).join(', ')} */}
-                    </>
-                  }
-                />
-                <Chip
-                  label={order.status}
-                  color={statusColors[order.status] || 'default'}
-                  size="small"
-                />
-              </ListItem>
-              {index < orders.length - 1 && <Divider variant="inset" component="li" />}
-            </React.Fragment>
+              </Grid>
+              
+              {/* Aquí podríamos poner un botón "Ver Detalles" en el futuro */}
+            </Paper>
           ))}
-        </List>
+        </Box>
       )}
     </Container>
   );
