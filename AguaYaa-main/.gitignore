@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+
+Backend/firebase-service-account-key.json
+node_modules/
+.env

@@ -26,6 +26,7 @@ import NotFoundPage from "./pages/NotFoundPage.jsx";
 import LoginPage from "./pages/auth/LoginPage.jsx";
 import LocalDashboardPage from "./pages/local/LocalDashboardPage.jsx";
 import LocalProductsPage from "./pages/local/LocalProductsPage.jsx";
+import LocalEmployeesPage from "./pages/local/LocalEmployeesPage.jsx"; // <--- 1. IMPORTAR NUEVA PÁGINA
 import DeliveryDashboardPage from "./pages/delivery/DeliveryDashboardPage.jsx";
 
 // Wrapper de providers QUE VAN DENTRO del Router (para que useNavigate funcione)
@@ -65,7 +66,6 @@ const router = createBrowserRouter(
         {
           path: "/",
           element: <RootLayout />,
-          // Importante: quitamos el "*" de aquí para que no intercepte /login
           children: [
             { index: true, element: <HomePage /> },
             { path: "stores", element: <StoresPage /> },
@@ -77,7 +77,7 @@ const router = createBrowserRouter(
           ],
         },
 
-        // Ruta de autenticación (sin RootLayout para que no muestre la navbar)
+        // Ruta de autenticación
         { path: "login", element: <LoginPage /> },
 
         // Rutas protegidas: LOCAL
@@ -89,6 +89,7 @@ const router = createBrowserRouter(
           children: [
             { index: true, element: <LocalDashboardPage /> },
             { path: "products", element: <LocalProductsPage /> },
+            { path: "employees", element: <LocalEmployeesPage /> }, // <--- 2. AGREGAR NUEVA RUTA AQUÍ
           ],
         },
 
@@ -101,7 +102,7 @@ const router = createBrowserRouter(
           children: [{ index: true, element: <DeliveryDashboardPage /> }],
         },
 
-        // Catch-all GLOBAL (fuera de RootLayout)
+        // Catch-all GLOBAL
         { path: "*", element: <NotFoundPage /> },
       ],
     },
