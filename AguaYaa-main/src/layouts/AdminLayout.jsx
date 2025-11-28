@@ -1,39 +1,65 @@
 import React from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
+import { Outlet, useLocation, Link as RouterLink, Navigate } from 'react-router-dom';
 import { Box, Container, Typography, AppBar, Toolbar, Button, Grid, Paper } from '@mui/material';
-import { Link as RouterLink } from 'react-router-dom';
 
 // --- ICONOS ---
 import HomeIcon from '@mui/icons-material/Home';
 import ListAltIcon from '@mui/icons-material/ListAlt';
 import DeliveryDiningIcon from '@mui/icons-material/DeliveryDining';
 import LogoutIcon from '@mui/icons-material/Logout';
-import PeopleIcon from '@mui/icons-material/People'; // <--- ¡ESTE FALTABA!
+import PeopleIcon from '@mui/icons-material/People';
+import SupervisorAccountIcon from '@mui/icons-material/SupervisorAccount'; // <--- Icono de Admin
 
-// Configuración del Menú Lateral
+import { useAuth } from '../context/AuthContext';
+
+// Configuración de los Menús Laterales
 const navItems = {
   '/local': [
     { to: '/local', icon: HomeIcon, label: 'Inicio' },
     { to: '/local/products', icon: ListAltIcon, label: 'Catálogo' },
-    { to: '/local/employees', icon: PeopleIcon, label: 'Empleados' }, // <--- Aquí usamos el icono
+    { to: '/local/employees', icon: PeopleIcon, label: 'Empleados' },
     { to: '/', icon: LogoutIcon, label: 'Salir' },
   ],
   '/delivery': [
     { to: '/delivery', icon: DeliveryDiningIcon, label: 'Mis Entregas' },
     { to: '/', icon: LogoutIcon, label: 'Salir' },
   ],
+  '/admin': [
+    { to: '/admin', icon: SupervisorAccountIcon, label: 'Aprobaciones' },
+    { to: '/', icon: LogoutIcon, label: 'Salir' },
+  ],
 };
 
 export default function AdminLayout() {
   const { pathname } = useLocation();
+  const { user, isLoading } = useAuth();
+
+  // 1. Esperar a que cargue la sesión
+  if (isLoading) return <div>Cargando...</div>;
+
+  // 2. EL MURO DE SEGURIDAD (Si la tienda no está verificada)
+  if (user?.role === 'local' && user?.verificationStatus === 'pending') {
+     return <Navigate to="/verification" replace />;
+  }
   
-  // Detectar si estamos en el panel de Local o Delivery
+  // 3. Detectar en qué panel estamos para cambiar el título y menú
+  const isAdmin = pathname.startsWith('/admin');
   const isLocal = pathname.startsWith('/local');
-  const roleTitle = isLocal ? 'Panel de Tienda' : 'Panel de Repartidor';
-  
-  // Seleccionar qué menú mostrar
-  // Si la ruta no coincide exactamente (ej: sub-rutas), usamos el fallback adecuado
-  const currentNavItems = isLocal ? navItems['/local'] : navItems['/delivery'];
+  const isDelivery = pathname.startsWith('/delivery');
+
+  let roleTitle = 'Panel';
+  let currentNavItems = [];
+
+  if (isAdmin) {
+    roleTitle = 'Super Admin 🛡️';
+    currentNavItems = navItems['/admin'];
+  } else if (isLocal) {
+    roleTitle = 'Panel de Tienda';
+    currentNavItems = navItems['/local'];
+  } else {
+    roleTitle = 'Panel de Repartidor';
+    currentNavItems = navItems['/delivery'];
+  }
 
   return (
     <>
@@ -62,7 +88,6 @@ export default function AdminLayout() {
                   component={RouterLink}
                   to={item.to}
                   startIcon={<item.icon />}
-                  // Resaltar botón si estamos en esa página
                   variant={pathname === item.to ? 'contained' : 'outlined'}
                   fullWidth
                   sx={{ 

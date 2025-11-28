@@ -1,134 +1,149 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
-  Typography, 
-  Box, 
-  Grid, 
-  Card, 
-  CardContent, 
-  Button, 
-  List, 
-  ListItem, 
-  ListItemText, 
-  Chip 
+  Box, Typography, Card, CardContent, CardActions, 
+  Button, Chip, Divider, Container, Alert, IconButton 
 } from '@mui/material';
-import MapIcon from '@mui/icons-material/Map';
+import TwoWheelerIcon from '@mui/icons-material/TwoWheeler';
+import LocationOnIcon from '@mui/icons-material/LocationOn';
+import PhoneIcon from '@mui/icons-material/Phone';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import DirectionsBikeIcon from '@mui/icons-material/DirectionsBike';
-import AccessTimeIcon from '@mui/icons-material/AccessTime';
-
-// Datos de entregas simuladas (vienen de la API, filtrados por repartidor)
-const mockDeliveries = [
-  { id: 201, customer: 'Ana García', address: 'Calle 10 #502, Col. Centro', status: 'En Ruta', time: '10:00 - 12:00', total: 15000 },
-  { id: 202, customer: 'Pedro López', address: 'Av. Norte 145, Fracc. Las Lomas', status: 'Pendiente', time: '12:00 - 14:00', total: 22000 },
-  { id: 203, customer: 'María Torres', address: 'Blvd. Principal 20, Residencial', status: 'Entregado', time: '08:00 - 10:00', total: 9500 },
-];
-
-// Componente para una Tarea de Entrega
-const DeliveryTask = ({ delivery }) => {
-  const isPending = delivery.status === 'Pendiente' || delivery.status === 'En Ruta';
-  
-  return (
-    <ListItem divider>
-      <ListItemText
-        primary={`#${delivery.id} - ${delivery.customer}`}
-        secondary={
-          <>
-            <Typography component="span" variant="body2" color="text.primary">
-              {delivery.address}
-            </Typography>
-            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                <AccessTimeIcon fontSize="inherit" sx={{ mr: 0.5 }} /> 
-                <Typography variant="caption">{delivery.time}</Typography>
-            </Box>
-          </>
-        }
-      />
-      <Box sx={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1 }}>
-        <Chip 
-          label={delivery.status} 
-          color={delivery.status === 'Entregado' ? 'success' : 'warning'} 
-          size="small" 
-        />
-        {isPending && (
-            <Button 
-                size="small" 
-                variant="contained" 
-                color="success"
-                startIcon={<CheckCircleIcon />}
-                onClick={() => console.log(`Marcar entrega #${delivery.id}`)}
-            >
-                Marcar Entregado
-            </Button>
-        )}
-      </Box>
-    </ListItem>
-  );
-};
-
+import MapIcon from '@mui/icons-material/Map';
+import { useAuth } from '../../context/AuthContext';
 
 export default function DeliveryDashboardPage() {
-  const pendingDeliveries = mockDeliveries.filter(d => d.status === 'Pendiente' || d.status === 'En Ruta');
-  
+  const { user } = useAuth();
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  // Cargar pedidos al entrar
+  useEffect(() => {
+    if (user?.uid) fetchOrders();
+  }, [user]);
+
+  const fetchOrders = async () => {
+    try {
+      setLoading(true);
+      // Pedimos las órdenes pendientes para ESTE chofer (basado en su tienda)
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/delivery/pending-orders?uid=${user.uid}`);
+      const data = await res.json();
+      
+      if (Array.isArray(data)) {
+        setOrders(data);
+      }
+    } catch (error) {
+      console.error("Error cargando entregas:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeliver = async (orderId) => {
+    if (!window.confirm("¿Confirmar que ya entregaste el pedido y recibiste el dinero?")) return;
+
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/delivery/orders/${orderId}/deliver`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uid: user.uid }) // Enviamos quién lo entregó
+      });
+
+      if (res.ok) {
+        alert("¡Excelente trabajo! Pedido completado.");
+        fetchOrders(); // Recargar lista
+      }
+    } catch (error) {
+      alert("Error al conectar con el servidor");
+    }
+  };
+
+  const openMap = (address) => {
+    // Truco: Abre la dirección en Google Maps App
+    const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address + " Nogales Sonora")}`;
+    window.open(url, '_blank');
+  };
+
   return (
-    <Box>
-      <Typography variant="h4" component="h1" sx={{ mb: 3 }}>
-        Mi Ruta de Hoy
-      </Typography>
+    <Container maxWidth="sm" sx={{ py: 3 }}>
+      <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
+        <TwoWheelerIcon color="primary" fontSize="large" />
+        <Typography variant="h5" fontWeight="bold">
+          Mis Entregas ({orders.length})
+        </Typography>
+      </Box>
 
-      <Grid container spacing={4}>
-        {/* Métrica Principal: Entregas Pendientes */}
-        <Grid item xs={12} md={4}>
-          <Card elevation={2} sx={{ p: 3, bgcolor: '#e0f7fa' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <DirectionsBikeIcon color="primary" sx={{ fontSize: 40 }} />
-                <Box>
-                    <Typography variant="h5">Entregas Pendientes</Typography>
-                    <Typography variant="h3" sx={{ fontWeight: 700, color: 'primary.main' }}>
-                      {pendingDeliveries.length}
-                    </Typography>
+      {orders.length === 0 ? (
+        <Alert severity="info" sx={{ mt: 4 }}>
+          No hay pedidos en ruta por ahora. ¡Descansa un poco! 😴
+        </Alert>
+      ) : (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {orders.map((order) => (
+            <Card key={order.order_id} elevation={4} sx={{ borderTop: '4px solid #1976d2' }}>
+              <CardContent>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="h6" fontWeight="bold">
+                    {order.customer_name}
+                  </Typography>
+                  <Chip label={`#${order.order_id}`} size="small" />
                 </Box>
-            </Box>
-          </Card>
-        </Grid>
-        
-        {/* Mapa de Ruta Simulada (Placeholder) */}
-        <Grid item xs={12} md={8}>
-          <Card elevation={2}>
-            <CardContent>
-              <Typography variant="h5" sx={{ mb: 2 }}>
-                Vista de Ruta
-              </Typography>
-              <Box 
-                sx={{ 
-                  height: 300, 
-                  bgcolor: '#ccc', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center',
-                  borderRadius: 1,
-                  color: 'grey.700'
-                }}
-              >
-                <MapIcon sx={{ fontSize: 60, mr: 1 }} />
-                Mapa de Google Maps Simulada (Integración futura con API)
-              </Box>
-              <Button variant="outlined" size="small" sx={{ mt: 2 }}>
-                Abrir en Google Maps
-              </Button>
-            </CardContent>
-          </Card>
-        </Grid>
 
-        {/* Lista de Tareas */}
-        <Grid item xs={12}>
-          <Typography variant="h5" sx={{ mt: 2, mb: 1 }}>Lista de Tareas ({pendingDeliveries.length} por completar)</Typography>
-          <List component={Card} sx={{ p: 0 }}>
-            {mockDeliveries.map(delivery => (
-              <DeliveryTask key={delivery.id} delivery={delivery} />
-            ))}
-          </List>
-        </Grid>
-      </Grid>
-    </Box>
+                {/* Botones de Acción Rápida (Llamar / Mapa) */}
+                <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+                  <Button 
+                    variant="outlined" size="small" startIcon={<MapIcon />}
+                    onClick={() => openMap(order.delivery_address)}
+                  >
+                    Ver Mapa
+                  </Button>
+                  <Button 
+                    variant="outlined" size="small" startIcon={<PhoneIcon />}
+                    href={`tel:${order.customer_phone}`}
+                  >
+                    Llamar
+                  </Button>
+                </Box>
+
+                <Typography variant="body2" sx={{ bgcolor: '#f5f5f5', p: 1, borderRadius: 1, mb: 2 }}>
+                  📍 {order.delivery_address}
+                </Typography>
+
+                {order.notes && (
+                  <Typography variant="caption" sx={{ color: 'orange', display: 'block', mb: 1 }}>
+                    ⚠ Nota: {order.notes}
+                  </Typography>
+                )}
+
+                <Divider />
+                
+                <Box sx={{ mt: 2 }}>
+                  {order.items.map((item, idx) => (
+                    <Typography key={idx} variant="body2">
+                      • {item.qty}x {item.name}
+                    </Typography>
+                  ))}
+                </Box>
+
+                <Typography variant="h5" align="right" color="primary" fontWeight="bold" sx={{ mt: 1 }}>
+                  Cobrar: ${parseFloat(order.total).toFixed(2)}
+                </Typography>
+              </CardContent>
+
+              <CardActions>
+                <Button 
+                  fullWidth 
+                  variant="contained" 
+                  color="success" 
+                  size="large"
+                  startIcon={<CheckCircleIcon />}
+                  onClick={() => handleDeliver(order.order_id)}
+                >
+                  ENTREGADO / COBRADO
+                </Button>
+              </CardActions>
+            </Card>
+          ))}
+        </Box>
+      )}
+    </Container>
   );
 }

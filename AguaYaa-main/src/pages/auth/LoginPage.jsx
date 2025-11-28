@@ -1,29 +1,67 @@
-import React, { useEffect } from 'react'; // <--- Importamos useEffect
-import { Box, Button, Typography, Container, Paper, Divider, Link } from '@mui/material';
+import React, { useState, useEffect } from 'react';
+import { 
+  Box, Button, Typography, Container, Paper, Divider, Link, TextField, Alert, InputAdornment 
+} from '@mui/material';
 import GoogleIcon from '@mui/icons-material/Google';
+import EmailIcon from '@mui/icons-material/Email';
+import LockIcon from '@mui/icons-material/Lock';
 import { useAuth } from '../../context/AuthContext';
-import { Link as RouterLink, useNavigate } from 'react-router-dom'; // <--- Importamos useNavigate
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
 
 export default function LoginPage() {
-  const { loginWithGoogle, isAuthenticated, role } = useAuth(); 
-  const navigate = useNavigate(); // <--- El "chofer" que nos lleva
+  const { loginWithGoogle, loginWithEmail, isAuthenticated, role } = useAuth(); 
+  const navigate = useNavigate();
 
-  // --- EFECTO DE REDIRECCIÓN ---
-  // Este bloque se ejecuta cada vez que cambia el estado del usuario
+  // Estados para el formulario de correo
+  const [formData, setFormData] = useState({ email: '', password: '' });
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  // --- REDIRECCIÓN INTELIGENTE (SEMÁFORO) ---
   useEffect(() => {
     if (isAuthenticated && role) {
-      console.log("Usuario detectado con rol:", role);
+      console.log("Rol detectado:", role); // Para depurar si es necesario
       
-      if (role === 'local') {
-        navigate('/local'); // Si es jefe, al panel
+      if (role === 'admin') {
+        navigate('/admin'); // <--- ¡AQUÍ ESTÁ EL CAMBIO! Jefe Supremo
+      } else if (role === 'local') {
+        navigate('/local'); // Dueño de Tienda
       } else if (role === 'delivery') {
-        navigate('/delivery'); // Si es chofer, a su ruta
+        navigate('/delivery'); // Repartidor
       } else {
-        navigate('/'); // Si es cliente, a comprar
+        navigate('/'); // Cliente Normal (client)
       }
     }
   }, [isAuthenticated, role, navigate]);
-  // -----------------------------
+
+  // Manejar Login con Email/Pass
+  const handleEmailLogin = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      await loginWithEmail(formData.email, formData.password);
+      // La redirección la maneja el useEffect de arriba
+    } catch (err) {
+      if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
+        setError('Correo o contraseña incorrectos.');
+      } else if (err.code === 'auth/too-many-requests') {
+        setError('Demasiados intentos. Intenta más tarde.');
+      } else {
+        setError('Error al iniciar sesión. Verifica tus datos.');
+      }
+      setLoading(false);
+    }
+  };
+
+  // Manejar Login con Google
+  const handleGoogleLogin = async () => {
+    try {
+      await loginWithGoogle();
+    } catch (err) {
+      setError('No se pudo iniciar con Google.');
+    }
+  };
 
   return (
     <Container component="main" maxWidth="xs" sx={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -38,34 +76,85 @@ export default function LoginPage() {
           borderRadius: 3 
         }}
       >
+        {/* LOGO */}
         <Typography component="h1" variant="h4" fontWeight="bold" color="primary" sx={{ mb: 1 }}>
           AguaYa 💧
         </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
-          La sed se acaba aquí
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+          Bienvenido de nuevo
         </Typography>
 
+        {error && <Alert severity="error" sx={{ width: '100%', mb: 2 }}>{error}</Alert>}
+
+        {/* --- FORMULARIO DE CORREO (Para Choferes, Dueños y ADMIN) --- */}
+        <Box component="form" onSubmit={handleEmailLogin} sx={{ width: '100%', mt: 1 }}>
+          <TextField
+            margin="normal" required fullWidth
+            label="Correo Electrónico"
+            type="email"
+            autoComplete="email"
+            value={formData.email}
+            onChange={(e) => setFormData({...formData, email: e.target.value})}
+            InputProps={{
+              startAdornment: <InputAdornment position="start"><EmailIcon color="action" /></InputAdornment>,
+            }}
+          />
+          <TextField
+            margin="normal" required fullWidth
+            label="Contraseña"
+            type="password"
+            autoComplete="current-password"
+            value={formData.password}
+            onChange={(e) => setFormData({...formData, password: e.target.value})}
+            InputProps={{
+              startAdornment: <InputAdornment position="start"><LockIcon color="action" /></InputAdornment>,
+            }}
+          />
+          
+          <Button
+            type="submit"
+            fullWidth
+            variant="contained"
+            size="large"
+            disabled={loading}
+            sx={{ mt: 3, mb: 2, py: 1.2, fontWeight: 'bold' }}
+          >
+            {loading ? 'Entrando...' : 'Iniciar Sesión'}
+          </Button>
+        </Box>
+
+        {/* DIVISOR */}
+        <Divider flexItem sx={{ my: 2 }}>
+          <Typography variant="caption" color="text.secondary">O CONTINUAR CON</Typography>
+        </Divider>
+
+        {/* BOTÓN GOOGLE (Para Clientes) */}
         <Button
           fullWidth
           variant="outlined"
-          size="large"
           startIcon={<GoogleIcon />}
-          onClick={loginWithGoogle}
-          sx={{ mb: 3, py: 1.5, textTransform: 'none', fontSize: '1.1rem' }}
+          onClick={handleGoogleLogin}
+          sx={{ mb: 2, py: 1, textTransform: 'none', color: '#555', borderColor: '#ccc' }}
         >
-          Continuar con Google
+          Google
         </Button>
 
-        <Divider flexItem sx={{ mb: 3 }}>
-          <Typography variant="caption" color="text.secondary">ACCESO SEGURO</Typography>
-        </Divider>
-
-        <Box sx={{ mt: 1, textAlign: 'center' }}>
-          <Typography variant="body2" color="text.secondary">¿Tienes una purificadora?</Typography>
-          <Link component={RouterLink} to="/register-business" variant="body2" fontWeight="bold" sx={{ textDecoration: 'none' }}>
+        {/* FOOTER: REGISTRO DE NEGOCIOS */}
+        <Box sx={{ mt: 2, textAlign: 'center' }}>
+          <Typography variant="body2" color="text.secondary">
+            ¿Tienes una purificadora?
+          </Typography>
+          <Link 
+            component={RouterLink} 
+            to="/register-business" 
+            variant="body2" 
+            fontWeight="bold"
+            sx={{ textDecoration: 'none' }}
+          >
             Regístrate como Vendedor
           </Link>
         </Box>
+
       </Paper>
     </Container>
   );

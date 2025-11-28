@@ -16,21 +16,26 @@ import { AuthProvider, ProtectedRoute } from "./context/AuthContext.jsx";
 import HomePage from "./pages/HomePage.jsx";
 import CheckoutPage from "./pages/CheckoutPage.jsx";
 import StoresPage from "./pages/StoresPage.jsx";
+import StoreDetailsPage from "./pages/StoreDetailsPage.jsx";
 import CatalogPage from "./pages/CatalogPage.jsx";
 import OrdersPage from "./pages/OrdersPage.jsx";
 import ContactPage from "./pages/ContactPage.jsx";
 import CartPage from "./pages/CartPage.jsx";
 import NotFoundPage from "./pages/NotFoundPage.jsx";
 
-// PÁGINAS DE ADMINISTRACIÓN
+// PÁGINAS DE AUTENTICACIÓN
 import LoginPage from "./pages/auth/LoginPage.jsx";
+import RegisterBusinessPage from "./pages/auth/RegisterBusinessPage.jsx";
+
+// PÁGINAS DE ADMINISTRACIÓN
 import LocalDashboardPage from "./pages/local/LocalDashboardPage.jsx";
 import LocalProductsPage from "./pages/local/LocalProductsPage.jsx";
-import LocalEmployeesPage from "./pages/local/LocalEmployeesPage.jsx"; // <--- 1. IMPORTAR NUEVA PÁGINA
+import LocalEmployeesPage from "./pages/local/LocalEmployeesPage.jsx";
+import StoreVerificationPage from "./pages/local/StoreVerificationPage.jsx"; // <--- Página de Bloqueo
+import SuperAdminPage from "./pages/admin/SuperAdminPage.jsx"; // <--- Página del Jefe Supremo
 import DeliveryDashboardPage from "./pages/delivery/DeliveryDashboardPage.jsx";
-import StoreDetailsPage from "./pages/StoreDetailsPage.jsx";
 
-// Wrapper de providers QUE VAN DENTRO del Router (para que useNavigate funcione)
+// Wrapper de providers
 function AppProviders() {
   return (
     <StoreProvider>
@@ -51,7 +56,6 @@ function AppProviders() {
   );
 }
 
-// Basename sincronizado con la base de Vite (quita la barra final si existe)
 const BASENAME =
   (import.meta.env.BASE_URL && import.meta.env.BASE_URL.replace(/\/$/, "")) ||
   "";
@@ -60,29 +64,41 @@ const BASENAME =
 const router = createBrowserRouter(
   [
     {
-      // Nivel raíz sin path: envuelve toda la app con los providers
       element: <AppProviders />,
       children: [
-        // Rutas públicas con el RootLayout
+        // --- RUTAS PÚBLICAS (Cliente) ---
         {
           path: "/",
           element: <RootLayout />,
           children: [
             { index: true, element: <HomePage /> },
             { path: "stores", element: <StoresPage /> },
+            { path: "store/:id", element: <StoreDetailsPage /> },
             { path: "catalog", element: <CatalogPage /> },
             { path: "orders", element: <OrdersPage /> },
             { path: "contact", element: <ContactPage /> },
             { path: "cart", element: <CartPage /> },
             { path: "checkout", element: <CheckoutPage /> },
-            { path: "store/:id", element: <StoreDetailsPage /> },
           ],
         },
 
-        // Ruta de autenticación
+        // --- AUTENTICACIÓN ---
         { path: "login", element: <LoginPage /> },
+        { path: "register-business", element: <RegisterBusinessPage /> },
+        
+        // --- RUTA DE VERIFICACIÓN (Sala de Espera) ---
+        { path: "verification", element: <StoreVerificationPage /> },
 
-        // Rutas protegidas: LOCAL
+        // --- RUTAS PROTEGIDAS: SUPER ADMIN ---
+        {
+          path: "admin",
+          element: (
+            <ProtectedRoute element={<AdminLayout />} requiredRole="admin" />
+          ),
+          children: [{ index: true, element: <SuperAdminPage /> }],
+        },
+
+        // --- RUTAS PROTEGIDAS: TIENDA (LOCAL) ---
         {
           path: "local",
           element: (
@@ -91,11 +107,11 @@ const router = createBrowserRouter(
           children: [
             { index: true, element: <LocalDashboardPage /> },
             { path: "products", element: <LocalProductsPage /> },
-            { path: "employees", element: <LocalEmployeesPage /> }, // <--- 2. AGREGAR NUEVA RUTA AQUÍ
+            { path: "employees", element: <LocalEmployeesPage /> },
           ],
         },
 
-        // Rutas protegidas: DELIVERY
+        // --- RUTAS PROTEGIDAS: REPARTIDOR ---
         {
           path: "delivery",
           element: (
@@ -104,7 +120,7 @@ const router = createBrowserRouter(
           children: [{ index: true, element: <DeliveryDashboardPage /> }],
         },
 
-        // Catch-all GLOBAL
+        // Catch-all
         { path: "*", element: <NotFoundPage /> },
       ],
     },
@@ -114,7 +130,6 @@ const router = createBrowserRouter(
   }
 );
 
-// Bootstrap
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <RouterProvider router={router} />

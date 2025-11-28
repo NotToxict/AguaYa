@@ -1,10 +1,17 @@
 import React, { createContext, useContext, useMemo, useState, useEffect } from "react";
-import { Navigate } from "react-router-dom"; // <--- Esto faltaba para las redirecciones
-import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "firebase/auth";
+import { Navigate } from "react-router-dom";
+// 👇 IMPORTANTE: Agregamos signInWithEmailAndPassword
+import { 
+  getAuth, 
+  signInWithPopup, 
+  GoogleAuthProvider, 
+  signOut, 
+  onAuthStateChanged,
+  signInWithEmailAndPassword 
+} from "firebase/auth";
 import { initializeApp } from "firebase/app";
 
-// --- CONFIGURACIÓN DE FIREBASE ---
-// Usa las variables que definimos en el archivo .env
+// Configuración de Firebase
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -14,7 +21,6 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
-// Inicializar Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const googleProvider = new GoogleAuthProvider();
@@ -25,50 +31,67 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Escuchar cambios en la sesión de Firebase
+  // Función auxiliar para sincronizar con TU Backend (PostgreSQL)
+  const syncWithBackend = async (firebaseUser) => {
+    try {
+      const token = await firebaseUser.getIdToken();
+      
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token })
+      });
+      
+      const data = await response.json();
+      
+      if (data.ok) {
+        setUser({
+          ...data.user, 
+          email: firebaseUser.email,
+          photoURL: firebaseUser.photoURL
+        });
+      } else {
+        console.error("Error en backend:", data.error);
+        setUser(null);
+      }
+    } catch (error) {
+      console.error("Error de conexión:", error);
+      setUser(null);
+    }
+  };
+
+  // Escuchar cambios de sesión
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        // Si el usuario se loguea en Firebase, verificamos su ROL en nuestro Backend
-        try {
-          const token = await firebaseUser.getIdToken();
-          
-          // Petición al Backend (Puerto 3001)
-          const response = await fetch('http://localhost:3001/api/auth/sync', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ token })
-          });
-          
-          const data = await response.json();
-          
-          if (data.ok) {
-            // Guardamos el usuario COMPLETO (con rol y localId)
-            setUser({
-              ...data.user, 
-              email: firebaseUser.email,
-              photoURL: firebaseUser.photoURL
-            });
-          }
-        } catch (error) {
-          console.error("Error sincronizando usuario con backend:", error);
-        }
+        await syncWithBackend(firebaseUser);
       } else {
-        // Si no hay usuario en Firebase, limpiamos el estado
         setUser(null);
       }
-      setLoading(false); // Terminó de cargar
+      setLoading(false);
     });
-
     return () => unsubscribe();
   }, []);
 
+  // --- MÉTODO 1: GOOGLE ---
   const loginWithGoogle = async () => {
     try {
       await signInWithPopup(auth, googleProvider);
-      // El useEffect de arriba se encargará de hacer la magia después
     } catch (error) {
-      console.error("Error en login Google:", error);
+      console.error("Error Google:", error);
+      throw error;
+    }
+  };
+
+  // --- MÉTODO 2: EMAIL Y PASSWORD (NUEVO) ---
+  const loginWithEmail = async (email, password) => {
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      // La sincronización ocurrirá automáticamente en el useEffect
+      return userCredential.user;
+    } catch (error) {
+      console.error("Error Email:", error);
+      throw error; // Lanzamos el error para mostrarlo en el formulario
     }
   };
 
@@ -82,6 +105,7 @@ export function AuthProvider({ children }) {
     isAuthenticated: !!user,
     role: user?.role,
     loginWithGoogle,
+    loginWithEmail, // <--- Exportamos la nueva función
     logout,
     isLoading: loading
   }), [user, loading]);
@@ -89,34 +113,25 @@ export function AuthProvider({ children }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-// Hook personalizado para usar el contexto
 export function useAuth() {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error("useAuth debe usarse dentro de un AuthProvider");
-  }
+  if (!context) throw new Error("useAuth debe usarse dentro de un AuthProvider");
   return context;
 }
 
-// --- COMPONENTE PROTECTED ROUTE (El que faltaba) ---
-// Este componente actúa como un guardia de seguridad para las rutas
+// Componente de Protección de Rutas
 export function ProtectedRoute({ element, requiredRole }) {
   const { isAuthenticated, user, isLoading } = useAuth();
 
-  // 1. Si está cargando, mostramos un mensaje de espera (o un spinner)
   if (isLoading) return <div>Cargando sesión...</div>;
 
-  // 2. Si NO está autenticado, lo mandamos al Login
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
 
-  // 3. Si requiere un rol específico (ej: 'local') y no lo tiene, lo sacamos
   if (requiredRole && user?.role !== requiredRole) {
-    console.warn(`Acceso denegado. Se requiere rol: ${requiredRole}`);
-    return <Navigate to="/" replace />; // Lo mandamos al inicio
+    return <Navigate to="/" replace />;
   }
 
-  // 4. Si pasa todas las pruebas, le mostramos la página
   return element;
 }
