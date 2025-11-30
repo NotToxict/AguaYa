@@ -3,9 +3,8 @@ const router = express.Router();
 const db = require('../config/db');
 
 // POST /api/orders
-// Recibe el carrito y datos del cliente para crear la orden
+// Crear un nuevo pedido (AHORA CON GPS Y MÉTODO DE PAGO)
 router.post('/', async (req, res) => {
-  // Extraemos pool para usar transacciones (BEGIN, COMMIT, ROLLBACK)
   const client = await db.pool.connect(); 
   
   try {
@@ -13,34 +12,40 @@ router.post('/', async (req, res) => {
       userId, localId, 
       customerName, customerPhone, deliveryAddress, notes,
       subtotal, deliveryFee, total,
-      items 
+      items,
+      // 👇 DATOS NUEVOS QUE FALTABAN:
+      deliveryLat, deliveryLng, paymentMethod 
     } = req.body;
 
-    // 1. Iniciar Transacción (Modo seguro)
     await client.query('BEGIN');
 
-    // 2. Insertar la ORDEN (Encabezado)
+    // 2. Insertar la ORDEN con coordenadas
     const orderQuery = `
       INSERT INTO orders (
         user_id, local_id, 
         customer_name, customer_phone, delivery_address, notes,
         subtotal, delivery_fee, total,
-        status
+        status,
+        delivery_lat, delivery_lng, payment_method
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending')
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending', $10, $11, $12)
       RETURNING order_id;
     `;
     
+    // Aseguramos que si no hay coordenadas, se guarde NULL
     const orderValues = [
       userId, localId, 
       customerName, customerPhone, deliveryAddress, notes || '',
-      subtotal, deliveryFee, total
+      subtotal, deliveryFee, total,
+      deliveryLat || null, 
+      deliveryLng || null, 
+      paymentMethod || 'cash'
     ];
 
     const orderResult = await client.query(orderQuery, orderValues);
     const orderId = orderResult.rows[0].order_id;
 
-    // 3. Insertar los ITEMS (Detalle)
+    // 3. Insertar ITEMS
     const itemQuery = `
       INSERT INTO order_items (
         order_id, product_id, quantity, 
@@ -60,23 +65,21 @@ router.post('/', async (req, res) => {
       ]);
     }
 
-    // 4. Confirmar Transacción (Guardar todo)
     await client.query('COMMIT');
 
     res.json({ ok: true, orderId, message: 'Pedido creado exitosamente' });
 
   } catch (error) {
-    // Si algo falla, deshacer todo (Rollback)
     await client.query('ROLLBACK');
     console.error('Error creando orden:', error);
     res.status(500).json({ ok: false, error: 'Error al procesar el pedido' });
   } finally {
-    client.release(); // Liberar conexión
+    client.release();
   }
 });
 
 // GET /api/orders/user/:uid
-// Ver mis pedidos (Para el cliente)
+// Ver mis pedidos
 router.get('/user/:uid', async (req, res) => {
   const { uid } = req.params;
   try {

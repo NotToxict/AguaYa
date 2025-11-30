@@ -13,6 +13,7 @@ const localRoutes = require('./routes/localRoutes'); // <--- La de empleados
 const orderRoutes = require('./routes/orderRoutes');
 const deliveryRoutes = require('./routes/deliveryRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const userRoutes = require('./routes/userRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -34,6 +35,7 @@ app.use('/api/auth', authRoutes);    // Login y Sincronización
 app.use('/api/local', localRoutes);  // Dashboard Dueño (Empleados)
 app.use('/api/orders', orderRoutes);
 app.use('/api/delivery', deliveryRoutes);
+app.use('/api/users', userRoutes);
 app.use('/api/admin', adminRoutes);
 
 // --- Iniciar Servidor ---

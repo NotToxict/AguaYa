@@ -4,8 +4,9 @@ import {
   CircularProgress, Grid, Divider
 } from '@mui/material';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import { useAuth } from '../context/AuthContext';
-import { formatCurrency } from '../utils/format'; // Asegúrate de tener esta utilidad o usa una simple
+import { Link } from 'react-router-dom'; // <--- Importante para la navegación
 
 export default function OrdersPage() {
   const { user } = useAuth();
@@ -20,7 +21,6 @@ export default function OrdersPage() {
 
   const fetchOrders = async () => {
     try {
-      // Petición al Backend usando el UID de Firebase
       const res = await fetch(`${import.meta.env.VITE_API_URL}/orders/user/${user.uid}`);
       const data = await res.json();
       
@@ -34,20 +34,18 @@ export default function OrdersPage() {
     }
   };
 
-  // Función para asignar color según el estado
   const getStatusColor = (status) => {
     const colors = {
-      pending: 'warning',    // Pendiente (Naranja)
-      accepted: 'info',      // Aceptado (Azul)
-      preparing: 'info',     // Preparando (Azul)
-      on_route: 'primary',   // En camino (Morado/Principal)
-      delivered: 'success',  // Entregado (Verde)
-      cancelled: 'error'     // Cancelado (Rojo)
+      pending: 'warning',
+      accepted: 'info',
+      preparing: 'info',
+      on_route: 'primary',
+      delivered: 'success',
+      cancelled: 'error'
     };
     return colors[status] || 'default';
   };
 
-  // Función para traducir el estado
   const getStatusLabel = (status) => {
     const labels = {
       pending: 'Pendiente',
@@ -74,6 +72,9 @@ export default function OrdersPage() {
         <Paper sx={{ p: 4, textAlign: 'center', bgcolor: '#f5f5f5' }}>
           <ReceiptLongIcon sx={{ fontSize: 60, color: 'text.disabled', mb: 2 }} />
           <Typography color="text.secondary">Aún no has realizado pedidos.</Typography>
+          <Button component={Link} to="/stores" sx={{ mt: 2 }} variant="outlined">
+            Ir a comprar
+          </Button>
         </Paper>
       ) : (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -84,7 +85,7 @@ export default function OrdersPage() {
                 {/* INFO PRINCIPAL */}
                 <Grid item xs={12} sm={8}>
                   <Typography variant="h6" fontWeight="bold">
-                    {order.local_name} {/* Nombre de la tienda (viene del JOIN en el backend) */}
+                    {order.local_name}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
                     {new Date(order.created_at).toLocaleDateString()} • {new Date(order.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
@@ -110,7 +111,18 @@ export default function OrdersPage() {
 
               </Grid>
               
-              {/* Aquí podríamos poner un botón "Ver Detalles" en el futuro */}
+              <Divider sx={{ my: 2 }} />
+
+              {/* BOTÓN DE SEGUIMIENTO */}
+              <Button 
+                component={Link} 
+                to={`/order/${order.order_id}`}
+                fullWidth 
+                variant="outlined"
+                startIcon={<VisibilityIcon />}
+              >
+                Ver Seguimiento
+              </Button>
             </Paper>
           ))}
         </Box>

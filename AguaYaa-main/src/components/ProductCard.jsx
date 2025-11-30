@@ -1,128 +1,103 @@
-import React, { useState, useEffect } from 'react';
-import {
-  Card,
-  CardContent,
-  CardActions,
-  CardMedia,
-  Button,
-  Typography,
-  CardActionArea,
-  CircularProgress,
-  Box,
+import React from 'react';
+import { 
+  Card, CardContent, CardMedia, Typography, Box, Button, Chip, Skeleton 
 } from '@mui/material';
-import CheckIcon from '@mui/icons-material/Check';
+import AddShoppingCartIcon from '@mui/icons-material/AddShoppingCart';
+import RemoveShoppingCartIcon from '@mui/icons-material/RemoveShoppingCart';
+import { motion } from 'framer-motion';
 import { useCart } from '../context/CartContext';
-import { formatCurrency } from '../utils/format';
-import { useUI } from '../context/UIContext';
 
-export default function ProductCard({ product }) {
-  const { addItem, items, clear } = useCart();
-  const { openQuickView } = useUI();
-  const [addState, setAddState] = useState('idle'); // 'idle', 'loading', 'success'
+// Animación para que se sienta "presionable"
+const MotionCard = motion(Card);
 
-  // Resetea el estado del botón si el producto cambia
-  useEffect(() => {
-    setAddState('idle');
-  }, [product]);
+export default function ProductCard({ product, storeInfo }) {
+  const { addToCart } = useCart();
+  
+  // Validamos si hay stock y si la tienda está abierta
+  const isOutOfStock = product.inventory_count <= 0;
+  const isStoreClosed = !storeInfo?.is_active;
+  const isDisabled = isOutOfStock || isStoreClosed;
 
-  const handleAdd = async () => {
-    // Verificar cambio de tienda
-    if (items.length > 0) {
-      const currentStoreId = items[0].storeId;
-      if (currentStoreId && currentStoreId !== product.storeId) {
-        const ok = window.confirm('Tu carrito pertenece a otra tienda. Cambiar de tienda vaciará tu carrito. ¿Continuar?');
-        if (!ok) return;
-        clear();
-      }
+  const handleAdd = () => {
+    if (!isDisabled) {
+      addToCart(product, storeInfo);
     }
-
-    console.log("Setting addState to loading"); // DEBUG
-    setAddState('loading');
-    await new Promise(resolve => setTimeout(resolve, 300));
-
-    try {
-      addItem(product);
-      console.log("Setting addState to success"); // DEBUG
-      setAddState('success');
-      setTimeout(() => {
-        console.log("Setting addState back to idle"); // DEBUG
-        setAddState('idle');
-      }, 1200);
-    } catch (error) {
-      console.error("Error adding item:", error);
-      console.log("Setting addState back to idle due to error"); // DEBUG
-      setAddState('idle');
-    }
-  };
-
-  const handleOpenQuick = () => {
-    openQuickView(product);
   };
 
   return (
-    <Card sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <CardActionArea onClick={handleOpenQuick} sx={{ flexGrow: 1 }}>
-        <CardMedia
-          component="div"
-          sx={{
-            height: 140,
-            bgcolor: 'grey.100',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'text.secondary',
-            fontWeight: 700,
-            overflow: 'hidden',
-          }}
-        >
-          {product.imageUrl ? (
-            <img
-              src={product.imageUrl}
-              alt={product.name}
-              loading="lazy"
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              // Añadir onError para mostrar placeholder si la imagen principal falla
-              onError={(e) => { e.target.onerror = null; e.target.src="/images/placeholder-product.png" }}
-            />
-          ) : (
-             // Mostrar placeholder si no hay imageUrl
-             <img
-               src="/images/placeholder-product.png"
-               alt={product.name}
-               loading="lazy"
-               style={{ width: 'auto', height: '80%', objectFit: 'contain', opacity: 0.5 }}
-             />
-             // O el texto alternativo anterior si prefieres:
-             // <Typography variant="caption" align="center" sx={{ p: 1 }}>{product.name} {product.size || ''}</Typography>
-          )}
-        </CardMedia>
-        <CardContent sx={{ flexGrow: 1 }}>
-          <Typography variant="subtitle1" fontWeight={600} noWrap title={product.name}>
+    <MotionCard 
+      elevation={3}
+      whileHover={{ y: -5, boxShadow: "0 10px 20px rgba(0,0,0,0.12)" }}
+      whileTap={{ scale: 0.98 }}
+      sx={{ 
+        height: '100%', 
+        display: 'flex', 
+        flexDirection: 'column', 
+        borderRadius: 3,
+        position: 'relative',
+        opacity: isDisabled ? 0.7 : 1, // Se ve "apagado" si no está disponible
+        filter: isDisabled ? 'grayscale(0.8)' : 'none'
+      }}
+    >
+      {/* Etiqueta de Estado (Agotado / Cerrado) */}
+      {isDisabled && (
+        <Chip 
+          label={isStoreClosed ? "CERRADO" : "AGOTADO"} 
+          color="error" 
+          size="small" 
+          sx={{ position: 'absolute', top: 10, right: 10, zIndex: 2, fontWeight: 'bold' }} 
+        />
+      )}
+
+      {/* Imagen con Fallback */}
+      <CardMedia
+        component="img"
+        height="180"
+        image={product.image_url || "https://via.placeholder.com/300x200?text=AguaYa"}
+        alt={product.name}
+        sx={{ objectFit: 'cover', bgcolor: '#f5f5f5' }}
+      />
+
+      <CardContent sx={{ flexGrow: 1, pb: 1 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', mb: 1 }}>
+          <Typography variant="h6" fontWeight="bold" lineHeight={1.2} sx={{ fontSize: '1.1rem' }}>
             {product.name}
           </Typography>
-          {product.size && (
-            <Typography variant="body2" color="text.secondary">
-              {product.size}
-            </Typography>
-          )}
-          <Typography variant="h6" sx={{ mt: 1 }}>
-            {formatCurrency(product.price)}
+          <Chip label={product.size} size="small" variant="outlined" color="primary" />
+        </Box>
+
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2, minHeight: '40px', fontSize: '0.85rem' }}>
+          {product.description || "Agua purificada de excelente calidad."}
+        </Typography>
+
+        <DividerLine />
+
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
+          <Typography variant="h5" color="primary.main" fontWeight="800">
+            ${parseFloat(product.price).toFixed(2)}
           </Typography>
-        </CardContent>
-      </CardActionArea>
-      <CardActions sx={{ justifyContent: 'flex-start', pt: 0, pb: 1.5, px: 1.5 }}>
-        <Button
-          variant="contained"
-          size="small"
-          onClick={handleAdd}
-          disabled={addState !== 'idle'}
-          sx={{ minWidth: 80 }}
-        >
-          {addState === 'loading' && <CircularProgress size={20} color="inherit" />}
-          {addState === 'success' && <CheckIcon fontSize="small" />}
-          {addState === 'idle' && 'Agregar'}
-        </Button>
-      </CardActions>
-    </Card>
+          
+          <Button 
+            variant="contained" 
+            size="medium"
+            disabled={isDisabled}
+            onClick={handleAdd}
+            sx={{ 
+              borderRadius: 20, 
+              textTransform: 'none', 
+              boxShadow: isDisabled ? 'none' : '0 4px 10px rgba(25, 118, 210, 0.4)' 
+            }}
+            startIcon={isDisabled ? <RemoveShoppingCartIcon /> : <AddShoppingCartIcon />}
+          >
+            {isDisabled ? 'No Disp.' : 'Agregar'}
+          </Button>
+        </Box>
+      </CardContent>
+    </MotionCard>
   );
 }
+
+// Un pequeño componente visual para la línea divisoria
+const DividerLine = () => (
+  <Box sx={{ height: '1px', width: '100%', bgcolor: 'rgba(0,0,0,0.08)', my: 1 }} />
+);

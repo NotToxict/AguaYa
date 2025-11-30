@@ -6,3 +6,26 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+@keyframes pop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.4); }
+  100% { transform: scale(1); }
+}
+
+/* --- Animación de Agua Fluyendo --- */
+@keyframes flowingWater {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 200% 50%; /* Se mueve el doble de su tamaño para un loop perfecto */
+  }
+}
+
+/* Clase utilitaria por si la queremos usar en otro lado */
+.water-flow {
+  background: linear-gradient(90deg, #1565C0 0%, #42A5F5 25%, #90CAF9 50%, #42A5F5 75%, #1565C0 100%);
+  background-size: 200% auto;
+  animation: flowingWater 3s linear infinite;
+}

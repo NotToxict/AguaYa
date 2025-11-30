@@ -1,52 +1,65 @@
 import React, { useState, useEffect } from 'react';
 import {
   Box, Container, Typography, TextField, Button, Paper, 
-  Grid, Divider, Alert, CircularProgress
+  Grid, Divider, Alert, CircularProgress, FormControlLabel, Checkbox,
+  Dialog, DialogTitle, List, ListItem, ListItemButton, ListItemText, ListItemIcon
 } from '@mui/material';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import LocationOnIcon from '@mui/icons-material/LocationOn';
+import HomeIcon from '@mui/icons-material/Home';
+import LocationPicker from '../components/LocationPicker';
 
 export default function CheckoutPage() {
   const { items, store, subtotal, shipping, total, clear } = useCart();
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
-  const [formData, setFormData] = useState({
-    name: '',
-    phone: '',
-    address: '',
-    notes: ''
-  });
+  const [formData, setFormData] = useState({ name: '', phone: '', address: '', notes: '' });
+  const [coords, setCoords] = useState({ lat: null, lng: null });
+  const [saveAddress, setSaveAddress] = useState(false); // Checkbox para guardar
+  const [addressAlias, setAddressAlias] = useState(''); // Nombre (Casa, Ofi)
+  
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Autocompletar nombre si el usuario está logueado
+  // Estados para el diálogo de "Mis Direcciones"
+  const [openAddressDialog, setOpenAddressDialog] = useState(false);
+  const [savedAddresses, setSavedAddresses] = useState([]);
+
+  // 1. Cargar datos del usuario al iniciar
   useEffect(() => {
     if (user) {
       setFormData(prev => ({
         ...prev,
         name: user.name || user.displayName || '',
-        // Podríamos traer dirección y teléfono si los guardamos en el perfil
+        phone: user.phone || '' // Si ya lo tiene en perfil, lo usamos
       }));
+      fetchSavedAddresses();
     }
   }, [user]);
 
-  if (items.length === 0) {
-    return (
-      <Container sx={{ mt: 4, textAlign: 'center' }}>
-        <Typography>No hay productos para pagar.</Typography>
-        <Button onClick={() => navigate('/stores')} sx={{ mt: 2 }}>Volver a Tiendas</Button>
-      </Container>
-    );
-  }
+  const fetchSavedAddresses = async () => {
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/users/${user.uid}/addresses`);
+      const data = await res.json();
+      if (Array.isArray(data)) setSavedAddresses(data);
+    } catch (e) { console.error(e); }
+  };
+
+  // Cuando selecciona una dirección guardada
+  const handleSelectAddress = (addr) => {
+    setFormData(prev => ({ ...prev, address: addr.address }));
+    setCoords({ lat: parseFloat(addr.latitude), lng: parseFloat(addr.longitude) });
+    setOpenAddressDialog(false); // Cerrar modal
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!isAuthenticated) {
-      setError("Debes iniciar sesión para completar el pedido.");
-      // Opcional: navigate('/login')
+    if (!coords.lat || !coords.lng) {
+      setError("Por favor selecciona tu ubicación exacta en el mapa.");
       return;
     }
 
@@ -54,17 +67,31 @@ export default function CheckoutPage() {
     setError('');
 
     try {
+      // A. SI EL USUARIO QUISO GUARDAR LA DIRECCIÓN
+      if (saveAddress) {
+        await fetch(`${import.meta.env.VITE_API_URL}/users/${user.uid}/addresses`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            alias: addressAlias || 'Nueva Dirección',
+            address: formData.address,
+            lat: coords.lat,
+            lng: coords.lng
+          })
+        });
+      }
+
+      // B. PROCESAR EL PEDIDO
       const payload = {
-        userId: user.uid, // ID de Firebase
+        userId: user.uid,
         localId: store.id,
         customerName: formData.name,
         customerPhone: formData.phone,
-        deliveryAddress: formData.address,
+        deliveryAddress: `${formData.address} (GPS: ${coords.lat}, ${coords.lng})`,
+        deliveryLat: coords.lat,
+        deliveryLng: coords.lng,
         notes: formData.notes,
-        subtotal: subtotal,
-        deliveryFee: shipping,
-        total: total,
-        items: items // Array de productos
+        subtotal, deliveryFee: shipping, total, items
       };
 
       const response = await fetch(`${import.meta.env.VITE_API_URL}/orders`, {
@@ -76,72 +103,106 @@ export default function CheckoutPage() {
       const data = await response.json();
 
       if (data.ok) {
-        clear(); // Vaciar carrito
-        // Redirigir a página de "Mis Pedidos" o una pantalla de éxito
-        // Por ahora, lo mandamos al historial de pedidos
+        clear();
         navigate('/orders'); 
       } else {
         setError(data.error || 'Error al procesar el pedido.');
       }
 
     } catch (err) {
-      console.error(err);
-      setError('Error de conexión. Intenta de nuevo.');
+      setError('Error de conexión.');
     } finally {
       setLoading(false);
     }
   };
 
+  if (items.length === 0) return <Container sx={{ mt: 4 }}>No hay productos.</Container>;
+
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
-      <Typography variant="h4" sx={{ mb: 3, fontWeight: 'bold' }}>
-        Finalizar Compra
-      </Typography>
+      <Typography variant="h4" sx={{ mb: 3, fontWeight: 'bold' }}>Finalizar Compra</Typography>
 
       <Grid container spacing={4}>
-        {/* FORMULARIO DE ENVÍO */}
         <Grid item xs={12} md={7}>
           <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" gutterBottom>Datos de Entrega</Typography>
+            
+            {/* ENCABEZADO Y BOTÓN DE DIRECCIONES GUARDADAS */}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <LocationOnIcon color="primary" /> Ubicación
+              </Typography>
+              {savedAddresses.length > 0 && (
+                <Button variant="outlined" size="small" onClick={() => setOpenAddressDialog(true)}>
+                  Mis Direcciones
+                </Button>
+              )}
+            </Box>
             
             {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-            <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <TextField 
-                label="Nombre de quien recibe" 
-                value={formData.name}
-                onChange={(e) => setFormData({...formData, name: e.target.value})}
-                required 
-              />
-              <TextField 
-                label="Teléfono de contacto" 
-                value={formData.phone}
-                onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                required 
-                placeholder="Ej: 631..."
-              />
-              <TextField 
-                label="Dirección completa" 
-                value={formData.address}
-                onChange={(e) => setFormData({...formData, address: e.target.value})}
-                required 
-                multiline rows={2}
-                placeholder="Calle, Número, Colonia, Referencias..."
-              />
-              <TextField 
-                label="Notas para el repartidor (Opcional)" 
-                value={formData.notes}
-                onChange={(e) => setFormData({...formData, notes: e.target.value})}
-                placeholder="Ej: Tocar el timbre fuerte"
-              />
+            <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              
+              {/* MAPA */}
+              <Box>
+                <Typography variant="subtitle2" gutterBottom>1. Confirma el punto en el mapa:</Typography>
+                {/* Pasamos 'key' con las coordenadas para forzar que el mapa se redibuje si cambian */}
+                <LocationPicker 
+                  key={`${coords.lat}-${coords.lng}`} 
+                  initialPosition={coords.lat ? coords : undefined}
+                  onLocationSelect={setCoords} 
+                />
+              </Box>
+
+              {/* DETALLES */}
+              <Box>
+                <Typography variant="subtitle2" gutterBottom>2. Datos de entrega:</Typography>
+                <TextField 
+                  label="Referencias / Dirección Escrita" 
+                  placeholder="Calle, Número, Colonia..."
+                  multiline rows={2} fullWidth required 
+                  value={formData.address}
+                  onChange={(e) => setFormData({...formData, address: e.target.value})}
+                  sx={{ mb: 2 }}
+                />
+                
+                {/* CHECKBOX PARA GUARDAR */}
+                <Box sx={{ p: 2, bgcolor: '#f0f4ff', borderRadius: 2, mb: 2 }}>
+                  <FormControlLabel
+                    control={<Checkbox checked={saveAddress} onChange={(e) => setSaveAddress(e.target.checked)} />}
+                    label="Guardar esta dirección para futuros pedidos"
+                  />
+                  {saveAddress && (
+                    <TextField 
+                      label="Nombre de la dirección (Ej: Casa, Oficina)" 
+                      size="small" fullWidth sx={{ mt: 1, bgcolor: 'white' }}
+                      value={addressAlias}
+                      onChange={(e) => setAddressAlias(e.target.value)}
+                    />
+                  )}
+                </Box>
+
+                <Grid container spacing={2}>
+                  <Grid item xs={6}>
+                    <TextField 
+                      label="Nombre" fullWidth required 
+                      value={formData.name}
+                      onChange={(e) => setFormData({...formData, name: e.target.value})}
+                    />
+                  </Grid>
+                  <Grid item xs={6}>
+                    <TextField 
+                      label="Teléfono" fullWidth required type="tel"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                    />
+                  </Grid>
+                </Grid>
+              </Box>
               
               <Button 
-                type="submit" 
-                variant="contained" 
-                size="large" 
-                disabled={loading}
+                type="submit" variant="contained" size="large" disabled={loading}
                 startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <CheckCircleIcon />}
-                sx={{ mt: 2, py: 1.5 }}
+                sx={{ py: 1.5, fontSize: '1.1rem' }}
               >
                 {loading ? 'Procesando...' : `Confirmar Pedido ($${total.toFixed(2)})`}
               </Button>
@@ -151,44 +212,33 @@ export default function CheckoutPage() {
 
         {/* RESUMEN */}
         <Grid item xs={12} md={5}>
-          <Paper sx={{ p: 3, bgcolor: '#f9f9f9' }}>
-            <Typography variant="h6" gutterBottom>Resumen del Pedido</Typography>
-            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-              Tienda: <strong>{store?.name}</strong>
-            </Typography>
+          {/* ... (Aquí va el mismo código de resumen que ya tenías) ... */}
+          {/* Para ahorrar espacio en el chat, asumo que dejas el bloque del resumen igual */}
+          <Paper sx={{ p: 3, bgcolor: '#f9f9f9', position: 'sticky', top: 100 }}>
+            <Typography variant="h6">Resumen</Typography>
             <Divider sx={{ my: 2 }} />
-            
-            {items.map((item) => (
-              <Box key={item.id} sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                <Typography variant="body2">
-                  {item.qty}x {item.name}
-                </Typography>
-                <Typography variant="body2" fontWeight="bold">
-                  ${(item.price * item.qty).toFixed(2)}
-                </Typography>
-              </Box>
-            ))}
-
+            {items.map(i => <Box key={i.id} mb={1}>{i.qty}x {i.name} - ${(i.price*i.qty).toFixed(2)}</Box>)}
             <Divider sx={{ my: 2 }} />
-            
-            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-              <Typography>Subtotal</Typography>
-              <Typography>${subtotal.toFixed(2)}</Typography>
-            </Box>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-              <Typography>Envío</Typography>
-              <Typography>${shipping.toFixed(2)}</Typography>
-            </Box>
-            
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
-              <Typography variant="h5" fontWeight="bold">Total</Typography>
-              <Typography variant="h5" fontWeight="bold" color="primary">
-                ${total.toFixed(2)}
-              </Typography>
-            </Box>
+            <Typography variant="h5" fontWeight="bold" align="right" color="primary">${total.toFixed(2)}</Typography>
           </Paper>
         </Grid>
       </Grid>
+
+      {/* DIÁLOGO DE SELECCIÓN DE DIRECCIONES */}
+      <Dialog open={openAddressDialog} onClose={() => setOpenAddressDialog(false)}>
+        <DialogTitle>Elige una dirección guardada</DialogTitle>
+        <List sx={{ pt: 0, minWidth: 300 }}>
+          {savedAddresses.map((addr) => (
+            <ListItem disableGutters key={addr.address_id}>
+              <ListItemButton onClick={() => handleSelectAddress(addr)}>
+                <ListItemIcon><HomeIcon /></ListItemIcon>
+                <ListItemText primary={addr.alias} secondary={addr.address} />
+              </ListItemButton>
+            </ListItem>
+          ))}
+        </List>
+      </Dialog>
+
     </Container>
   );
 }

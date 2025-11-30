@@ -1,111 +1,177 @@
-import React, { useState, useEffect } from "react"; // Añadir useEffect
-import { Container, Box, Typography, CircularProgress, Alert } from "@mui/material"; // Añadir CircularProgress, Alert
-import AnimatedHero from "../components/AnimatedHero";
-import StoreCarousel from "../components/StoreCarousel";
-import ProductCarousel from "../components/ProductCarousel";
-import ProductQuickView from "../components/ProductQuickView";
-// Quitar importación directa de datos: import products from "../data/products";
-// Quitar importación directa de datos: import stores from "../data/stores";
-import { useSnackbar } from "notistack";
-// Importar los nuevos servicios
-import { fetchFeaturedStores, fetchFeaturedProducts } from "../services/storeService";
+import React from 'react';
+import { 
+  Box, Typography, Container, Paper, Grid, Button, IconButton, Chip 
+} from '@mui/material';
+import { motion } from 'framer-motion';
+import { Link as RouterLink } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+
+// Iconos
+import LocalDrinkIcon from '@mui/icons-material/LocalDrink';
+import AcUnitIcon from '@mui/icons-material/AcUnit';
+import StorefrontIcon from '@mui/icons-material/Storefront';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import SearchIcon from '@mui/icons-material/Search';
+
+// Swiper (Carrusel)
+import { Swiper, SwiperSlide } from 'swiper/react';
+import { Autoplay, Pagination } from 'swiper/modules';
+// Estilos de Swiper (Asegúrate de tenerlos instalados o usa tu archivo swiper.css)
+import 'swiper/css';
+import 'swiper/css/pagination';
+
+// CATEGORÍAS RÁPIDAS
+const categories = [
+  { label: 'Agua', icon: <LocalDrinkIcon />, color: '#E3F2FD', textColor: '#1976d2' },
+  { label: 'Hielo', icon: <AcUnitIcon />, color: '#E0F7FA', textColor: '#0097a7' },
+  { label: 'Tiendas', icon: <StorefrontIcon />, color: '#F3E5F5', textColor: '#7b1fa2' },
+];
+
+// BANNERS DE PROMOCIÓN (Datos falsos por ahora)
+const banners = [
+  { id: 1, title: '2x1 en Garrafones', sub: 'Solo por hoy en Manantial', color: '#1565c0' },
+  { id: 2, title: 'Envío GRATIS', sub: 'En tu primer pedido', color: '#2e7d32' },
+  { id: 3, title: 'Nuevos Horarios', sub: 'Entregamos hasta las 8 PM', color: '#ed6c02' },
+];
 
 export default function HomePage() {
-  const [selectedProduct, setSelectedProduct] = useState(null);
-  const { enqueueSnackbar } = useSnackbar();
+  const { user } = useAuth();
 
-  // Estados para tiendas destacadas
-  const [featuredStores, setFeaturedStores] = useState([]);
-  const [storesLoading, setStoresLoading] = useState(true);
-  const [storesError, setStoresError] = useState(null);
-
-  // Estados para productos destacados (ofertas)
-  const [featuredProducts, setFeaturedProducts] = useState([]);
-  const [productsLoading, setProductsLoading] = useState(true);
-  const [productsError, setProductsError] = useState(null);
-
-  // Efecto para cargar datos al montar
-  useEffect(() => {
-    // Cargar tiendas destacadas
-    setStoresLoading(true);
-    setStoresError(null);
-    fetchFeaturedStores()
-      .then(setFeaturedStores)
-      .catch(err => {
-        console.error("Error fetching featured stores:", err);
-        setStoresError("No se pudieron cargar las tiendas destacadas.");
-      })
-      .finally(() => setStoresLoading(false));
-
-    // Cargar productos destacados
-    setProductsLoading(true);
-    setProductsError(null);
-    fetchFeaturedProducts()
-      .then(setFeaturedProducts)
-      .catch(err => {
-        console.error("Error fetching featured products:", err);
-        setProductsError("No se pudieron cargar las ofertas.");
-      })
-      .finally(() => setProductsLoading(false));
-
-  }, []); // Cargar solo al montar
-
-  const addToCart = (p) => {
-    // TODO: integra tu lógica real de carrito
-    // Asegúrate de que tu lógica de useCart ya esté conectada si la necesitas aquí.
-    enqueueSnackbar(`${p?.name ?? "Producto"} agregado al carrito`, { variant: "success" });
-  };
-
-  const handleQuickView = (product) => {
-    setSelectedProduct(product);
-  };
-
-  const handleCloseQuickView = () => {
-    setSelectedProduct(null);
+  // Animación base para los elementos
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0 }
   };
 
   return (
-    <Container maxWidth="lg" sx={{ pt: 2, mb: { xs: 10, md: 6 } }}> {/* Añadido margen inferior */}
-      <AnimatedHero
-        title="AguaYa — Tiendas cerca de ti"
-        subtitle="Ofertas y productos destacadas de tus tiendas favoritas"
-        ctaText="Ver tiendas"
-        onCta={() => window.scrollTo({ top: 400, behavior: "smooth" })}
-      />
-
-      {/* Sección Tiendas Destacadas */}
-      <Box sx={{ mt: 2 }}>
-        <Typography variant="h6" sx={{ mb: 1 }}>
-          Tiendas destacadas
-        </Typography>
-        {storesLoading && <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}><CircularProgress size={24} /></Box>}
-        {storesError && !storesLoading && <Alert severity="warning" sx={{ mb: 2 }}>{storesError}</Alert>}
-        {!storesLoading && !storesError && <StoreCarousel stores={featuredStores} />}
+    <Container maxWidth="md" sx={{ pb: 8, overflowX: 'hidden' }}>
+      
+      {/* 1. ENCABEZADO DE BIENVENIDA */}
+      <Box 
+        component={motion.div}
+        initial="hidden" animate="visible" variants={itemVariants} transition={{ duration: 0.5 }}
+        sx={{ mt: 3, mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+      >
+        <Box>
+          <Typography variant="body2" color="text.secondary">Estás en:</Typography>
+          <Typography variant="subtitle1" fontWeight="bold" sx={{ display: 'flex', alignItems: 'center' }}>
+            📍 {user?.default_address ? 'Casa' : 'Seleccionar Ubicación'} 
+            <Typography component="span" variant="caption" sx={{ ml: 1, color: 'primary.main', cursor: 'pointer' }}>▼</Typography>
+          </Typography>
+        </Box>
+        <IconButton sx={{ bgcolor: '#f5f5f5' }}>
+          <SearchIcon />
+        </IconButton>
       </Box>
 
-      {/* Sección Ofertas */}
-      <Box sx={{ mt: 4 }}>
-        <Typography variant="h6" sx={{ mb: 1 }}>
-          Ofertas para ti
+      {/* 2. SALUDO PERSONAL */}
+      <Box 
+        component={motion.div}
+        initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}
+        sx={{ mb: 3 }}
+      >
+        <Typography variant="h4" fontWeight="900" letterSpacing={-1}>
+          Hola, {user?.name?.split(' ')[0] || 'Vecino'} 👋
         </Typography>
-        {productsLoading && <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}><CircularProgress size={24} /></Box>}
-        {productsError && !productsLoading && <Alert severity="error" sx={{ mb: 2 }}>{productsError}</Alert>}
-        {!productsLoading && !productsError && (
-          <ProductCarousel
-            products={featuredProducts}
-            onQuickView={handleQuickView}
-            onAdd={addToCart}
-          />
-        )}
+        <Typography variant="h6" color="text.secondary" fontWeight="400">
+          ¿Qué se te antoja hoy?
+        </Typography>
       </Box>
 
-      {/* Modal QuickView (sin cambios) */}
-      <ProductQuickView
-        open={!!selectedProduct}
-        product={selectedProduct}
-        onClose={handleCloseQuickView}
-        onAdd={addToCart}
-      />
+      {/* 3. CARRUSEL DE PROMOCIONES (SWIPER) */}
+      <Box 
+        component={motion.div}
+        initial="hidden" animate="visible" variants={itemVariants} transition={{ delay: 0.3 }}
+        sx={{ mb: 4, borderRadius: 4, overflow: 'hidden', boxShadow: '0 8px 30px rgba(0,0,0,0.12)' }}
+      >
+        <Swiper
+          modules={[Autoplay, Pagination]}
+          spaceBetween={10}
+          slidesPerView={1}
+          autoplay={{ delay: 3500, disableOnInteraction: false }}
+          pagination={{ clickable: true }}
+          style={{ height: '160px' }}
+        >
+          {banners.map((b) => (
+            <SwiperSlide key={b.id}>
+              <Box sx={{ 
+                height: '100%', 
+                bgcolor: b.color, 
+                color: 'white', 
+                p: 3, 
+                display: 'flex', 
+                flexDirection: 'column', 
+                justifyContent: 'center',
+                backgroundImage: 'linear-gradient(45deg, rgba(0,0,0,0.2) 25%, transparent 25%, transparent 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2) 75%, transparent 75%, transparent)',
+                backgroundSize: '40px 40px'
+              }}>
+                <Typography variant="h4" fontWeight="bold">{b.title}</Typography>
+                <Typography variant="subtitle1">{b.sub}</Typography>
+              </Box>
+            </SwiperSlide>
+          ))}
+        </Swiper>
+      </Box>
+
+      {/* 4. CATEGORÍAS RÁPIDAS */}
+      <Typography variant="h6" fontWeight="bold" sx={{ mb: 2 }}>Categorías</Typography>
+      <Grid container spacing={2} sx={{ mb: 4 }}>
+        {categories.map((cat, idx) => (
+          <Grid item xs={4} key={idx}>
+            <Paper 
+              component={motion.div}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              component={RouterLink}
+              to="/stores" // Por ahora todas llevan a tiendas
+              elevation={0}
+              sx={{ 
+                p: 2, 
+                display: 'flex', 
+                flexDirection: 'column', 
+                alignItems: 'center', 
+                bgcolor: cat.color, 
+                borderRadius: 3,
+                textDecoration: 'none',
+                cursor: 'pointer'
+              }}
+            >
+              <Box sx={{ color: cat.textColor, mb: 1 }}>{cat.icon}</Box>
+              <Typography variant="body2" fontWeight="bold" color="text.primary">
+                {cat.label}
+              </Typography>
+            </Paper>
+          </Grid>
+        ))}
+      </Grid>
+
+      {/* 5. ACCESO DIRECTO A TIENDAS */}
+      <Box 
+        component={motion.div}
+        initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }}
+        sx={{ 
+          bgcolor: 'background.paper', 
+          p: 3, 
+          borderRadius: 4, 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'space-between',
+          border: '1px solid #eee'
+        }}
+      >
+        <Box>
+          <Typography variant="h6" fontWeight="bold">Purificadoras Cerca</Typography>
+          <Typography variant="body2" color="text.secondary">Encuentra la mejor calidad</Typography>
+        </Box>
+        <IconButton 
+          component={RouterLink} 
+          to="/stores"
+          sx={{ bgcolor: 'primary.main', color: 'white', '&:hover': { bgcolor: 'primary.dark' } }}
+        >
+          <ArrowForwardIcon />
+        </IconButton>
+      </Box>
+
     </Container>
   );
 }

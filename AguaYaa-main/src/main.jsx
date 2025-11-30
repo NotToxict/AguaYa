@@ -20,8 +20,10 @@ import StoreDetailsPage from "./pages/StoreDetailsPage.jsx";
 import CatalogPage from "./pages/CatalogPage.jsx";
 import OrdersPage from "./pages/OrdersPage.jsx";
 import ContactPage from "./pages/ContactPage.jsx";
+import ProfilePage from "./pages/ProfilePage.jsx";
 import CartPage from "./pages/CartPage.jsx";
 import NotFoundPage from "./pages/NotFoundPage.jsx";
+import OrderDetailPage from "./pages/OrderDetailPage.jsx";
 
 // PÁGINAS DE AUTENTICACIÓN
 import LoginPage from "./pages/auth/LoginPage.jsx";
@@ -31,9 +33,10 @@ import RegisterBusinessPage from "./pages/auth/RegisterBusinessPage.jsx";
 import LocalDashboardPage from "./pages/local/LocalDashboardPage.jsx";
 import LocalProductsPage from "./pages/local/LocalProductsPage.jsx";
 import LocalEmployeesPage from "./pages/local/LocalEmployeesPage.jsx";
-import StoreVerificationPage from "./pages/local/StoreVerificationPage.jsx"; // <--- Página de Bloqueo
-import SuperAdminPage from "./pages/admin/SuperAdminPage.jsx"; // <--- Página del Jefe Supremo
+import StoreVerificationPage from "./pages/local/StoreVerificationPage.jsx";
+import SuperAdminPage from "./pages/admin/SuperAdminPage.jsx";
 import DeliveryDashboardPage from "./pages/delivery/DeliveryDashboardPage.jsx";
+import RegisterClientPage from "./pages/auth/RegisterClientPage.jsx";
 
 // Wrapper de providers
 function AppProviders() {
@@ -66,26 +69,33 @@ const router = createBrowserRouter(
     {
       element: <AppProviders />,
       children: [
-        // --- RUTAS PÚBLICAS (Cliente) ---
+        // --- AUTENTICACIÓN (PÚBLICAS) ---
+        // Estas son las ÚNICAS páginas que se pueden ver sin entrar
+        { path: "login", element: <LoginPage /> },
+        { path: "register-business", element: <RegisterBusinessPage /> },
+        { path: "register", element: <RegisterClientPage /> },
+        
+        // --- RUTAS DE CLIENTE (AHORA PROTEGIDAS) 🔒 ---
+        // Antes eran públicas, ahora requieren estar logueado (cualquier rol)
         {
           path: "/",
-          element: <RootLayout />,
+          element: (
+            <ProtectedRoute element={<RootLayout />} /> 
+          ),
           children: [
             { index: true, element: <HomePage /> },
             { path: "stores", element: <StoresPage /> },
             { path: "store/:id", element: <StoreDetailsPage /> },
             { path: "catalog", element: <CatalogPage /> },
+            { path: "profile", element: <ProfilePage /> },
             { path: "orders", element: <OrdersPage /> },
             { path: "contact", element: <ContactPage /> },
             { path: "cart", element: <CartPage /> },
             { path: "checkout", element: <CheckoutPage /> },
+            { path: "order/:id", element: <OrderDetailPage /> },
           ],
         },
 
-        // --- AUTENTICACIÓN ---
-        { path: "login", element: <LoginPage /> },
-        { path: "register-business", element: <RegisterBusinessPage /> },
-        
         // --- RUTA DE VERIFICACIÓN (Sala de Espera) ---
         { path: "verification", element: <StoreVerificationPage /> },
 

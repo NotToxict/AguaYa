@@ -139,6 +139,21 @@ export default function LoginPage() {
           Google
         </Button>
 
+        {/* ENLACE DE REGISTRO CLIENTE */}
+        <Box sx={{ mt: 2, mb: 1, textAlign: 'center' }}>
+          <Typography variant="body2">
+            ¿Eres nuevo?{' '}
+            <Link component={RouterLink} to="/register" fontWeight="bold" sx={{ textDecoration: 'none' }}>
+              Crea tu cuenta aquí
+            </Link>
+          </Typography>
+        </Box>
+
+        {/* DIVISOR DELGADO */}
+        <Divider sx={{ width: '50%', my: 2, mx: 'auto' }} />
+
+        {/* FOOTER: REGISTRO DE NEGOCIOS (Lo que ya tenías) */}
+
         {/* FOOTER: REGISTRO DE NEGOCIOS */}
         <Box sx={{ mt: 2, textAlign: 'center' }}>
           <Typography variant="body2" color="text.secondary">
