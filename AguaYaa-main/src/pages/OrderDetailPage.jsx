@@ -8,9 +8,10 @@ import DeliveryDiningIcon from '@mui/icons-material/DeliveryDining';
 import ReceiptIcon from '@mui/icons-material/Receipt';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import MapIcon from '@mui/icons-material/Map';
+import DirectionsBikeIcon from '@mui/icons-material/DirectionsBike'; // Faltaba importar
 import { useAuth } from '../context/AuthContext';
 
-// Configuración de Estados y Porcentajes
+// Configuración de Estados
 const statusConfig = {
   pending: { percent: 10, label: 'Recibido', color: 'warning', text: 'Esperando confirmación de la tienda...' },
   accepted: { percent: 30, label: 'Aceptado', color: 'info', text: 'La tienda aceptó tu pedido.' },
@@ -28,7 +29,6 @@ export default function OrderDetailPage() {
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Auto-refresh para ver el avance en tiempo real (cada 10s)
   useEffect(() => {
     fetchOrder();
     const interval = setInterval(fetchOrder, 10000); 
@@ -37,7 +37,6 @@ export default function OrderDetailPage() {
 
   const fetchOrder = async () => {
     try {
-      // Usamos el endpoint de usuario para buscar el pedido
       const res = await fetch(`${import.meta.env.VITE_API_URL}/orders/user/${user.uid}`);
       const data = await res.json();
       const found = data.find(o => o.order_id === parseInt(id));
@@ -53,7 +52,6 @@ export default function OrderDetailPage() {
 
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
-      {/* HEADER */}
       <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/orders')} sx={{ mb: 2 }}>
         Volver
       </Button>
@@ -68,7 +66,24 @@ export default function OrderDetailPage() {
         />
       </Box>
 
-      {/* --- BARRA DE PROGRESO LÍQUIDA (WATER FLOW) --- */}
+      {/* --- ALERTA DE LLEGADA (TIMBRE) --- */}
+      {order.driver_arrived_at && order.status !== 'delivered' && (
+        <Fade in={true}>
+          <Alert 
+            severity="warning" 
+            variant="filled" 
+            sx={{ mb: 3, borderRadius: 2, fontWeight: 'bold', fontSize: '1.1rem', boxShadow: 3 }}
+            icon={<DirectionsBikeIcon fontSize="large" />}
+          >
+            🔔 ¡TU REPARTIDOR YA LLEGÓ!
+            <Typography variant="body2" sx={{ mt: 0.5 }}>
+              Está esperando afuera. Por favor sal a recibir tu pedido.
+            </Typography>
+          </Alert>
+        </Fade>
+      )}
+
+      {/* --- BARRA DE PROGRESO --- */}
       <Paper elevation={3} sx={{ p: 4, mb: 4, borderRadius: 3, bgcolor: '#fafafa' }}>
         <Typography variant="h5" fontWeight="bold" gutterBottom color="text.primary">
           {currentStatus.label}
@@ -93,7 +108,6 @@ export default function OrderDetailPage() {
               borderRadius: 10,
               bgcolor: 'transparent',
               '& .MuiLinearProgress-bar': {
-                // EFECTO DE AGUA
                 background: `linear-gradient(
                   90deg, 
                   #1565C0 0%,   
@@ -103,7 +117,7 @@ export default function OrderDetailPage() {
                   #1565C0 100%   
                 )`,
                 backgroundSize: '200% auto',
-                animation: order.status === 'delivered' ? 'none' : 'flowingWater 2s linear infinite', // Requiere @keyframes en index.css
+                animation: order.status === 'delivered' ? 'none' : 'flowingWater 2s linear infinite',
                 borderRadius: 10,
                 transition: 'transform 1s ease-in-out',
                 boxShadow: '0 0 10px rgba(33, 150, 243, 0.5)'
@@ -111,18 +125,9 @@ export default function OrderDetailPage() {
             }} 
           />
         </Box>
-        
-        {/* Animación extra si está en camino */}
-        {order.status === 'on_route' && (
-          <Fade in={true}>
-            <Typography variant="caption" sx={{ mt: 1, display: 'block', textAlign: 'right', color: 'primary.main', fontWeight: 'bold' }}>
-              🚚 El repartidor se está moviendo...
-            </Typography>
-          </Fade>
-        )}
       </Paper>
 
-      {/* DETALLES DE LA ENTREGA Y PAGO */}
+      {/* DETALLES */}
       <Grid container spacing={3}>
         <Grid item xs={12} md={7}>
           <Paper sx={{ p: 3, height: '100%', borderRadius: 2 }}>
@@ -137,7 +142,6 @@ export default function OrderDetailPage() {
             <Typography variant="subtitle2" color="text.secondary">Tienda</Typography>
             <Typography paragraph fontWeight="medium">{order.local_name}</Typography>
 
-            {/* Mapa Estático si hay coordenadas */}
             {order.delivery_lat && (
               <Box sx={{ mt: 2, p: 2, bgcolor: '#e3f2fd', borderRadius: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
                 <MapIcon color="primary" />
