@@ -14,7 +14,9 @@ export default function RootLayout() {
       {/* AQUÍ BORRAMOS <AddressBar /> para que no salga doble */}
 
       <main style={{ minHeight: '80vh' }}>
-        <Outlet />
+        <div key={window.location.pathname} className="animate-page">
+            <Outlet />
+        </div>
       </main>
 
       {/* Componentes globales */}

@@ -1,86 +1,119 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
-import { Box, Typography, Button, CircularProgress, Alert } from '@mui/material';
+import { Box, Button, CircularProgress, Alert, Typography } from '@mui/material';
 import MyLocationIcon from '@mui/icons-material/MyLocation';
 
 const containerStyle = {
   width: '100%',
-  height: '300px',
-  borderRadius: '12px',
-  marginTop: '10px'
+  height: '350px',
+  borderRadius: '16px',
+  marginTop: '10px',
+  boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
 };
 
-// Coordenadas por defecto (Nogales, Sonora)
-const centerDefault = {
-  lat: 31.301198,
-  lng: -110.938173
-};
+const centerDefault = { lat: 31.301198, lng: -110.938173 };
+
+const mapStyles = [
+  { "featureType": "all", "elementType": "geometry.fill", "stylers": [{ "weight": "2.00" }] },
+  { "featureType": "all", "elementType": "geometry.stroke", "stylers": [{ "color": "#9c9c9c" }] },
+  { "featureType": "all", "elementType": "labels.text", "stylers": [{ "visibility": "on" }] },
+  { "featureType": "landscape", "elementType": "all", "stylers": [{ "color": "#f2f2f2" }] },
+  { "featureType": "poi", "elementType": "all", "stylers": [{ "visibility": "off" }] },
+  { "featureType": "road", "elementType": "all", "stylers": [{ "saturation": -100 }, { "lightness": 45 }] },
+  { "featureType": "water", "elementType": "all", "stylers": [{ "color": "#46bcec" }, { "visibility": "on" }] }
+];
+
+// LIBRARIES: Importante pedir 'places' y 'geocoding' al cargar
+const libraries = ['places'];
 
 export default function LocationPicker({ onLocationSelect, initialPosition }) {
   const { isLoaded, loadError } = useJsApiLoader({
     id: 'google-map-script',
-    // Asegúrate de tener esta variable en tu .env del Frontend
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_KEY 
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_KEY,
+    libraries: libraries // <--- IMPORTANTE
   });
 
   const [map, setMap] = useState(null);
   const [markerPosition, setMarkerPosition] = useState(initialPosition || centerDefault);
   const [error, setError] = useState('');
+  const [loadingLocation, setLoadingLocation] = useState(false);
 
-  const onLoad = useCallback(function callback(map) {
-    setMap(map);
-  }, []);
+  const onLoad = useCallback((map) => setMap(map), []);
+  const onUnmount = useCallback(() => setMap(null), []);
 
-  const onUnmount = useCallback(function callback(map) {
-    setMap(null);
-  }, []);
-
-  // Efecto para actualizar si el padre manda nuevas coordenadas (ej: al seleccionar una dirección guardada)
-  React.useEffect(() => {
-    if (initialPosition && initialPosition.lat && initialPosition.lng) {
+  useEffect(() => {
+    if (initialPosition?.lat) {
       setMarkerPosition(initialPosition);
       map?.panTo(initialPosition);
     }
   }, [initialPosition, map]);
 
-  // Al hacer clic en el mapa, movemos el marcador
+  // --- FUNCIÓN MÁGICA: GEOCODING INVERSO (Pin -> Texto) ---
+  const getAddressFromCoords = async (lat, lng) => {
+    try {
+      const geocoder = new window.google.maps.Geocoder();
+      const response = await geocoder.geocode({ location: { lat, lng } });
+      
+      if (response.results[0]) {
+        const address = response.results[0].formatted_address;
+        // Devolvemos tanto coordenadas como la dirección en texto
+        onLocationSelect({ lat, lng, address }); 
+      } else {
+        onLocationSelect({ lat, lng, address: '' });
+      }
+    } catch (e) {
+      console.error("Error geocoding:", e);
+      onLocationSelect({ lat, lng, address: '' }); // Aún si falla el nombre, mandamos coords
+    }
+  };
+
   const handleMapClick = (e) => {
     const lat = e.latLng.lat();
     const lng = e.latLng.lng();
     const newPos = { lat, lng };
     setMarkerPosition(newPos);
-    onLocationSelect(newPos); // Enviamos coordenadas al padre
+    // Llamamos a la función que busca el nombre de la calle
+    getAddressFromCoords(lat, lng); 
+    setError('');
   };
 
-  // Obtener ubicación actual del usuario (GPS)
+  // --- GPS ---
   const handleLocateMe = () => {
-    if (!navigator.geolocation) {
+    setLoadingLocation(true);
+    setError('');
+
+    const updatePosition = (lat, lng) => {
+      const newPos = { lat, lng };
+      setMarkerPosition(newPos);
+      map?.panTo(newPos);
+      map?.setZoom(17);
+      getAddressFromCoords(lat, lng); // <--- También aquí buscamos el nombre
+      setLoadingLocation(false);
+    };
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => updatePosition(pos.coords.latitude, pos.coords.longitude),
+        (err) => {
+          console.warn("Fallo GPS, intentando IP...");
+          // Fallback IP (opcional, si ya lo tenías implementado puedes dejarlo)
+          setLoadingLocation(false);
+          setError('No pudimos obtener tu ubicación exacta.');
+        },
+        { enableHighAccuracy: true, timeout: 5000 }
+      );
+    } else {
       setError('Tu navegador no soporta geolocalización');
-      return;
+      setLoadingLocation(false);
     }
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const pos = {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude
-        };
-        setMarkerPosition(pos);
-        map?.panTo(pos);
-        onLocationSelect(pos);
-        setError('');
-      },
-      () => {
-        setError('No pudimos obtener tu ubicación. Revisa los permisos.');
-      }
-    );
   };
 
-  if (loadError) return <Alert severity="error">Error cargando Google Maps. Revisa tu API Key.</Alert>;
-  if (!isLoaded) return <Box p={5} textAlign="center"><CircularProgress /> Cargando Mapa...</Box>;
+  if (loadError) return <Alert severity="error">Error mapa.</Alert>;
+  if (!isLoaded) return <Box p={5} textAlign="center"><CircularProgress /> Cargando...</Box>;
 
   return (
-    <Box sx={{ position: 'relative', border: '1px solid #ddd', borderRadius: 3, overflow: 'hidden' }}>
-      {error && <Alert severity="warning" sx={{ mb: 1 }}>{error}</Alert>}
+    <Box sx={{ position: 'relative', borderRadius: 4, overflow: 'hidden', boxShadow: 2 }}>
+      {error && <Alert severity="warning" sx={{ mb: 0, borderRadius: 0 }}>{error}</Alert>}
       
       <GoogleMap
         mapContainerStyle={containerStyle}
@@ -89,39 +122,20 @@ export default function LocationPicker({ onLocationSelect, initialPosition }) {
         onLoad={onLoad}
         onUnmount={onUnmount}
         onClick={handleMapClick}
-        options={{
-          disableDefaultUI: true, // Mapa limpio sin botones extra
-          zoomControl: true,
-        }}
+        options={{ disableDefaultUI: true, zoomControl: true, styles: mapStyles }}
       >
-        {/* El marcador muestra dónde caerá el pedido */}
         <Marker position={markerPosition} animation={window.google.maps.Animation.DROP} />
       </GoogleMap>
 
-      {/* Botón flotante para "Mi Ubicación" */}
       <Button
-        variant="contained"
-        color="secondary"
-        size="small"
-        startIcon={<MyLocationIcon />}
+        variant="contained" color="primary" size="small"
+        startIcon={loadingLocation ? <CircularProgress size={20} color="inherit" /> : <MyLocationIcon />}
         onClick={handleLocateMe}
-        sx={{ 
-          position: 'absolute', 
-          top: 10, 
-          right: 10, 
-          bgcolor: 'white', 
-          color: 'primary.main', 
-          '&:hover': { bgcolor: '#f5f5f5' } 
-        }}
+        disabled={loadingLocation}
+        sx={{ position: 'absolute', bottom: 20, right: 10, bgcolor: 'white', color: 'primary.main', boxShadow: 3, fontWeight: 'bold', '&:hover': { bgcolor: '#f5f5f5' } }}
       >
-        Mi Ubicación
+        {loadingLocation ? '...' : 'Mi Ubicación'}
       </Button>
-
-      <Box sx={{ p: 1, bgcolor: '#f9f9f9', borderTop: '1px solid #eee' }}>
-        <Typography variant="caption" align="center" display="block" color="text.secondary">
-          Toca el mapa para ajustar el punto de entrega exacto 📍
-        </Typography>
-      </Box>
     </Box>
   );
 }

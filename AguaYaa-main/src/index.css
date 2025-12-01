@@ -29,3 +29,100 @@ body {
   background-size: 200% auto;
   animation: flowingWater 3s linear infinite;
 }
+
+/* =========================================
+   ✨ ANIMACIONES GLOBALES (AGUAYA FX)
+   ========================================= */
+
+/* 1. Animación de Entrada Suave para TODO */
+/* Esto hace que cada vez que algo nuevo se pinte, entre suave */
+@keyframes fadeInSlide {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+#root > * {
+  animation: fadeInSlide 0.5s ease-out;
+}
+
+/* 2. Botones Vivos (Efecto Rebote) */
+/* Aplica a todos los botones de Material UI */
+button.MuiButton-root, 
+button.MuiIconButton-root, 
+.MuiFab-root {
+  transition: transform 0.1s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+button.MuiButton-root:active, 
+button.MuiIconButton-root:active, 
+.MuiFab-root:active {
+  transform: scale(0.95) !important; /* Se achica al clic */
+}
+
+/* 3. Tarjetas Flotantes (Hover) */
+/* Aplica a todos los Cards y Papers */
+.MuiCard-root, 
+.MuiPaper-elevation1,
+.MuiPaper-elevation2,
+.MuiPaper-elevation3 {
+  transition: transform 0.3s ease, box-shadow 0.3s ease !important;
+}
+
+.MuiCard-root:hover, 
+.MuiPaper-elevation1:hover,
+.MuiPaper-elevation2:hover,
+.MuiPaper-elevation3:hover {
+  /* Solo si no es un contenedor grande de layout */
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(0,0,0,0.1) !important;
+}
+
+/* Excepción: No queremos que el Header o el Footer floten */
+header.MuiAppBar-root, 
+footer {
+  transform: none !important;
+  box-shadow: none !important; /* O su sombra original */
+}
+
+/* 4. Inputs Brillantes */
+.MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
+  border-width: 2px !important;
+  border-color: #1976d2 !important;
+  box-shadow: 0 0 8px rgba(25, 118, 210, 0.25);
+}
+
+/* 5. Scroll Suave */
+html {
+  scroll-behavior: smooth;
+}
+
+/* 6. Barra de Scroll Bonita (WebKit) */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f1f1; 
+}
+::-webkit-scrollbar-thumb {
+  background: #ccc; 
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #999; 
+}
+
+/* 7. Efecto de Agua (Ya lo tenías, lo dejamos aquí por si acaso) */
+@keyframes flowingWater {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+
+.animate-page {
+  animation: fadeInSlide 0.4s ease-out;
+}
