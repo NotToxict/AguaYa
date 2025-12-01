@@ -1,16 +1,18 @@
 const { Pool } = require('pg');
 require('dotenv').config();
 
-// LÓGICA INTELIGENTE:
-// Si existe DATABASE_URL (Railway), úsala con configuración SSL.
-// Si no, usa las variables sueltas (Tu PC).
+// Lógica: Si estamos en la nube (Railway), usa la variable DATABASE_URL.
+// Si estamos en local, usa las variables sueltas.
+const isProduction = process.env.NODE_ENV === 'production' || process.env.DATABASE_URL;
 
-const connectionConfig = process.env.DATABASE_URL 
-  ? { 
-      connectionString: process.env.DATABASE_URL, 
-      ssl: { rejectUnauthorized: false } // <--- ¡ESTO ES CRÍTICO PARA LA NUBE!
+const connectionConfig = isProduction
+  ? {
+      connectionString: process.env.DATABASE_URL,
+      ssl: {
+        rejectUnauthorized: false // Vital para Railway/Render
+      }
     }
-  : { 
+  : {
       user: process.env.DB_USER || 'postgres',
       host: process.env.DB_HOST || 'localhost',
       database: process.env.DB_DATABASE || 'aguaya_db',
@@ -26,7 +28,8 @@ pool.on('connect', () => {
 
 pool.on('error', (err) => {
   console.error('❌ Error inesperado en PostgreSQL', err);
-  process.exit(-1);
+  // No matamos el proceso en producción para que intente reconectar
+  if (!isProduction) process.exit(-1);
 });
 
 module.exports = {

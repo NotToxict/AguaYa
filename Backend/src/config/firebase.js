@@ -3,35 +3,28 @@ const admin = require('firebase-admin');
 
 let serviceAccount;
 
-if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-  // EN LA NUBE: Leemos la variable de entorno (Texto JSON)
-  try {
-    serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-  } catch (e) {
-    console.error("❌ Error parseando FIREBASE_SERVICE_ACCOUNT");
-  }
-} else {
-  // EN LOCAL: Buscamos el archivo físico
-  const path = require('path');
-  try {
+try {
+  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    // EN LA NUBE: Leemos la variable de entorno (Texto JSON)
+    // Railway a veces escapa los saltos de línea, intentamos parsear
+    const rawKey = process.env.FIREBASE_SERVICE_ACCOUNT;
+    serviceAccount = JSON.parse(rawKey);
+  } else {
+    // EN LOCAL: Buscamos el archivo físico
+    const path = require('path');
     serviceAccount = require(path.join(__dirname, '../../firebase-service-account-key.json'));
-  } catch (e) {
-    console.warn("⚠️ No se encontró el archivo de llaves local.");
   }
-}
 
-if (serviceAccount) {
-  try {
-    // Evitar inicializar doble si ya existe
-    if (!admin.apps.length) {
-      admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount)
-      });
-      console.log("🔥 Firebase Admin SDK inicializado");
-    }
-  } catch (error) {
-    console.error("❌ Error inicializando Firebase:", error);
+  // Inicializar solo si no existe ya
+  if (!admin.apps.length) {
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount)
+    });
+    console.log("🔥 Firebase Admin SDK inicializado correctamente");
   }
+} catch (error) {
+  console.error("❌ Error CRÍTICO inicializando Firebase:", error.message);
+  // En producción esto debería detener el deploy si falla, pero por ahora solo logueamos
 }
 
 module.exports = admin;
