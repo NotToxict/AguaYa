@@ -2,10 +2,14 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
 
+// ==========================================
+// 🛵 RUTAS DEL REPARTIDOR
+// ==========================================
+
 // GET /api/delivery/pending-orders
-// Obtiene pedidos "En Camino" de la tienda a la que pertenece el chofer
+// Obtiene pedidos "En Camino" asignados a la tienda del chofer
 router.get('/pending-orders', async (req, res) => {
-  const { uid } = req.query; // Recibimos el UID del chofer
+  const { uid } = req.query; 
 
   try {
     // 1. Averiguar a qué tienda pertenece este chofer
@@ -17,12 +21,12 @@ router.get('/pending-orders', async (req, res) => {
 
     if (!localId) return res.status(400).json({ error: 'No estás vinculado a ninguna tienda' });
 
-    // 2. Buscar pedidos de esa tienda que estén "on_route" (En camino)
-    // Nota: Usamos JSON_AGG para agrupar los productos en un array, igual que en el dashboard del dueño
+    // 2. Buscar pedidos "on_route"
     const ordersQuery = `
       SELECT 
         o.order_id, o.customer_name, o.customer_phone, o.delivery_address, 
-        o.total, o.notes, o.status,
+        o.total, o.notes, o.status, 
+        o.delivery_lat, o.delivery_lng, 
         json_agg(json_build_object('name', oi.product_name_at_order, 'qty', oi.quantity)) as items
       FROM orders o
       JOIN order_items oi ON o.order_id = oi.order_id
@@ -41,14 +45,27 @@ router.get('/pending-orders', async (req, res) => {
   }
 });
 
+// 🔥 NUEVA RUTA: /arrived (El timbre)
+// El chofer avisa que llegó
+router.put('/orders/:id/arrived', async (req, res) => {
+  const { id } = req.params;
+  try {
+    // Guardamos la hora exacta de llegada
+    await db.query('UPDATE orders SET driver_arrived_at = NOW() WHERE order_id = $1', [id]);
+    res.json({ ok: true, message: 'Cliente notificado' });
+  } catch (error) {
+    console.error('Error notify arrival:', error);
+    res.status(500).json({ error: 'No se pudo notificar' });
+  }
+});
+
 // PUT /api/delivery/orders/:id/deliver
-// Marcar pedido como ENTREGADO
+// Marcar pedido como ENTREGADO y COBRADO
 router.put('/orders/:id/deliver', async (req, res) => {
-  const { id } = req.params; // ID del pedido
-  const { uid } = req.body;  // ID del chofer que lo entregó
+  const { id } = req.params; 
+  const { uid } = req.body; 
 
   try {
-    // Actualizamos estado, fecha de entrega y asignamos al chofer responsable
     const query = `
       UPDATE orders 
       SET status = 'delivered', 
@@ -62,6 +79,31 @@ router.put('/orders/:id/deliver', async (req, res) => {
   } catch (error) {
     console.error('Error marking delivered:', error);
     res.status(500).json({ error: 'No se pudo finalizar el pedido' });
+  }
+});
+
+// GET /api/delivery/history
+// Historial (Para evitar errores si el frontend lo pide)
+router.get('/history', async (req, res) => {
+  const { uid } = req.query;
+  try {
+    const query = `
+      SELECT order_id, customer_name, delivery_address, total, delivered_at
+      FROM orders 
+      WHERE assigned_repartidor_id = $1 AND status = 'delivered'
+      ORDER BY delivered_at DESC LIMIT 20
+    `;
+    const result = await db.query(query, [uid]);
+    
+    const totalQuery = `SELECT SUM(total) as total_collected FROM orders WHERE assigned_repartidor_id = $1 AND status = 'delivered'`;
+    const totalRes = await db.query(totalQuery, [uid]);
+
+    res.json({
+      history: result.rows,
+      totalCollected: totalRes.rows[0].total_collected || 0
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Error al obtener historial' });
   }
 });
 
