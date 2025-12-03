@@ -47,7 +47,16 @@ export default function SuperAdminPage() {
   const [rejectReason, setRejectReason] = useState('');
 
   useEffect(() => {
+    // 1. Carga inicial inmediata
     fetchData();
+
+    // 2. Configurar el "Auto-Refresco" cada 5 segundos
+    const intervalId = setInterval(() => {
+      fetchData();
+    }, 5000);
+
+    // 3. Limpieza al salir de la página
+    return () => clearInterval(intervalId);
   }, []);
 
   const fetchData = () => {

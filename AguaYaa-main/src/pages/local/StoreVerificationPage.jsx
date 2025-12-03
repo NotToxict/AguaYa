@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react'; // <--- Importamos useEffect
 import { 
   Box, Typography, Button, Paper, Container, Alert, LinearProgress,
   FormControl, InputLabel, Select, MenuItem 
@@ -15,12 +15,43 @@ export default function StoreVerificationPage() {
   const { user } = useAuth();
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
-  
-  // Estado para elegir qué documento estamos corrigiendo
-  const [docType, setDocType] = useState(''); // Vacio al inicio para obligar a elegir
+  const [docType, setDocType] = useState('');
 
-  // Leemos el estado. Si el usuario en contexto no se ha actualizado, usamos 'pending'
-  const status = user?.verificationStatus || 'pending';
+  // 1. ESTADO LOCAL PARA EL STATUS
+  // Iniciamos con lo que tenga el usuario, o 'pending' por defecto
+  const [currentStatus, setCurrentStatus] = useState(user?.verificationStatus || 'pending');
+
+  // 2. EFECTO DE AUTO-REFRESCO (POLLING)
+  useEffect(() => {
+    if (!user) return;
+
+    const checkStatus = async () => {
+      try {
+        // Consultamos la info más reciente del usuario
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/users/${user.uid}`);
+        if (res.ok) {
+          const freshUser = await res.json();
+          // Si el status cambió (ej. de 'pending' a 'approved'), actualizamos el estado local
+          if (freshUser.verification_status && freshUser.verification_status !== currentStatus) {
+            setCurrentStatus(freshUser.verification_status);
+            // Opcional: Recargar la página completa si se aprueba para actualizar permisos
+            if (freshUser.verification_status === 'approved') {
+               window.location.reload();
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error verificando status:", error);
+      }
+    };
+
+    // Ejecutar inmediatamente y luego cada 5 segundos
+    checkStatus();
+    const intervalId = setInterval(checkStatus, 5000);
+
+    return () => clearInterval(intervalId); // Limpieza al salir
+  }, [user, currentStatus]);
+
 
   const handleUploadAndRetry = async () => {
     if (!file) return alert("Selecciona un archivo.");
@@ -29,24 +60,20 @@ export default function StoreVerificationPage() {
     setUploading(true);
 
     try {
-      // 1. SUBIR A FIREBASE STORAGE (NUBE)
-      // Guardamos con el tipo correcto (ej: INE_123456.jpg)
       const storageRef = ref(storage, `documents/${user.localId}/${docType}_${Date.now()}_${file.name}`);
       await uploadBytes(storageRef, file);
       const downloadUrl = await getDownloadURL(storageRef);
 
-      // 2. GUARDAR EN BASE DE DATOS (TIERRA)
       await fetch(`${import.meta.env.VITE_API_URL}/local/documents`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           localId: user.localId,
-          type: docType, // <--- Ahora enviamos el tipo correcto (INE, RFC...)
+          type: docType,
           url: downloadUrl
         })
       });
 
-      // 3. SOLICITAR NUEVA REVISIÓN
       const res = await fetch(`${import.meta.env.VITE_API_URL}/local/request-verification/${user.localId}`, {
         method: 'PUT'
       });
@@ -66,10 +93,10 @@ export default function StoreVerificationPage() {
     }
   };
 
-  // --- VISTAS SEGÚN ESTADO ---
+  // --- VISTAS SEGÚN ESTADO (Usamos currentStatus en vez de user.status) ---
 
   // 1. APROBADO
-  if (status === 'approved') {
+  if (currentStatus === 'approved') {
     return (
       <Container maxWidth="sm" sx={{ mt: 10, textAlign: 'center' }}>
         <Paper elevation={3} sx={{ p: 5, borderRadius: 4, borderTop: '6px solid #2e7d32' }}>
@@ -86,8 +113,8 @@ export default function StoreVerificationPage() {
     );
   }
 
-  // 2. PENDIENTE (SALA DE ESPERA)
-  if (status === 'pending') {
+  // 2. PENDIENTE
+  if (currentStatus === 'pending') {
     return (
       <Container maxWidth="sm" sx={{ mt: 10, textAlign: 'center' }}>
         <Paper elevation={3} sx={{ p: 5, borderRadius: 4, borderTop: '6px solid #ed6c02' }}>
@@ -97,8 +124,9 @@ export default function StoreVerificationPage() {
             Ya hemos recibido tus documentos. Nuestro equipo los está analizando.
           </Alert>
           <Typography variant="body2" color="text.secondary" paragraph>
-            Te notificaremos cuando tu tienda sea aprobada.
+            Esta pantalla se actualizará automáticamente cuando seas aprobado.
           </Typography>
+          <LinearProgress sx={{ mt: 2, mb: 2, maxWidth: 200, mx: 'auto' }} />
           <Button variant="outlined" color="inherit" href="/" sx={{ mt: 2 }}>
             Volver al Inicio
           </Button>
@@ -107,7 +135,7 @@ export default function StoreVerificationPage() {
     );
   }
 
-  // 3. RECHAZADO (CORRECCIÓN)
+  // 3. RECHAZADO
   return (
     <Container maxWidth="md" sx={{ py: 8 }}>
       <Paper elevation={4} sx={{ p: 5, textAlign: 'center', borderRadius: 3, borderTop: '6px solid #d32f2f' }}>
@@ -130,7 +158,6 @@ export default function StoreVerificationPage() {
             Selecciona qué documento vas a corregir y sube el archivo nuevo.
           </Typography>
           
-          {/* SELECTOR DE TIPO DE DOCUMENTO */}
           <FormControl fullWidth sx={{ mb: 2, bgcolor: 'white' }}>
             <InputLabel>¿Qué documento vas a subir?</InputLabel>
             <Select

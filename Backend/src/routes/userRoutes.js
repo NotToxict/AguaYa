@@ -7,7 +7,7 @@ const db = require('../config/db');
 router.get('/:uid', async (req, res) => {
   const { uid } = req.params;
   try {
-    const query = 'SELECT firebase_uid, email, name, phone, role, default_address, default_payment_method FROM users WHERE firebase_uid = $1';
+    const query = 'SELECT firebase_uid, email, name, phone, role, default_address, default_payment_method, verification_status FROM users WHERE firebase_uid = $1';
     const result = await db.query(query, [uid]);
     
     if (result.rows.length === 0) {
