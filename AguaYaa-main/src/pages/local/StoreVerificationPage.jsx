@@ -35,9 +35,9 @@ export default function StoreVerificationPage() {
           if (freshUser.verification_status && freshUser.verification_status !== currentStatus) {
             setCurrentStatus(freshUser.verification_status);
             // Opcional: Recargar la página completa si se aprueba para actualizar permisos
-            if (freshUser.verification_status === 'approved') {
-               window.location.reload();
-            }
+          //  if (freshUser.verification_status === 'approved') {
+            //   window.location.reload();
+           // }
           }
         }
       } catch (error) {
