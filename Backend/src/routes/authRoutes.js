@@ -40,7 +40,7 @@ router.post('/sync', async (req, res) => {
         localId: user.associated_local_id,
         name: user.name,
         verificationStatus: user.verification_status || 'approved',
-        rejectionReason: user.rejection_reason // <--- Importante para mostrar el error
+        rejectionReason: user.rejection_reason 
       }
     });
   } catch (error) {
@@ -71,9 +71,9 @@ router.post('/register-business', async (req, res) => {
     const localRes = await client.query(localQuery, [name, address, phone, uid, lat, lng]);
     const localId = localRes.rows[0].local_id;
 
-    // 2. Actualizar Usuario
+    // 2. Actualizar Usuario Y FORZAR ESTADO A PENDING (CORRECCIÓN AQUÍ)
     await client.query(
-      `UPDATE users SET role = 'local', associated_local_id = $1 WHERE firebase_uid = $2`,
+      `UPDATE users SET role = 'local', associated_local_id = $1, verification_status = 'pending' WHERE firebase_uid = $2`,
       [localId, uid]
     );
 
@@ -90,6 +90,7 @@ router.post('/register-business', async (req, res) => {
 
   } catch (error) {
     await client.query('ROLLBACK');
+    console.error("Error en registro:", error);
     res.status(500).json({ error: 'No se pudo registrar el negocio' });
   } finally {
     client.release();
