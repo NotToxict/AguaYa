@@ -1,32 +1,31 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import { VitePWA } from 'vite-plugin-pwa' // CRÍTICO: Importar el plugin PWA
+import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  // CRÍTICO 1: Base path para GitHub Pages
-  base: '/AguaYaa/', 
+  // 1. QUITAMOS "base: '/AguaYaa/'" para que funcione en la raíz de Vercel
   
   plugins: [
     react(),
-    // CRÍTICO 2: Configuración del plugin PWA
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg', 'images/*'], // Asegúrate de incluir imágenes
+      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
       manifest: {
-        name: 'AguaYaa',
+        name: 'AguaYa',
         short_name: 'AguaYaa',
         description: 'Tu app de entrega de agua tipo marketplace.',
-        theme_color: '#1976d2', // Color de tu tema
+        theme_color: '#1976d2',
         background_color: '#ffffff',
-        // CRÍTICO 3: Rutas del Manifest para GitHub Pages
-        start_url: '/AguaYaa/', 
-        scope: '/AguaYaa/',
+        
+        // 2. CORREGIMOS LAS RUTAS (Quitamos /AguaYaa/)
+        start_url: '/', 
+        scope: '/',
+        
         display: 'standalone',
         icons: [
-          // Debes colocar tus íconos en la carpeta /public/
           {
-            src: 'pwa-192x192.png',
+            src: 'pwa-192x192.png', // Sin /AguaYaa/ al principio
             sizes: '192x192',
             type: 'image/png',
           },
