@@ -190,9 +190,23 @@ router.post('/documents', async (req, res) => {
 router.put('/request-verification/:localId', async (req, res) => {
   const { localId } = req.params;
   try {
-    await db.query("UPDATE locales SET verification_status = 'pending', rejection_reason = NULL WHERE local_id = $1", [localId]);
-    res.json({ ok: true, message: 'Solicitud reenviada' });
-  } catch (error) { res.status(500).json({ error: 'Error solicitud' }); }
+    // 1. Actualizar la TIENDA a 'pending' y obtener el ID del dueño
+    const result = await db.query(
+      "UPDATE locales SET verification_status = 'pending', rejection_reason = NULL WHERE local_id = $1 RETURNING owner_user_id", 
+      [localId]
+    );
+
+    // 2. Si la tienda se actualizó, actualizamos también al USUARIO a 'pending'
+    if (result.rows.length > 0) {
+      const ownerId = result.rows[0].owner_user_id;
+      await db.query("UPDATE users SET verification_status = 'pending' WHERE firebase_uid = $1", [ownerId]);
+    }
+
+    res.json({ ok: true, message: 'Solicitud reenviada y usuario sincronizado' });
+  } catch (error) { 
+    console.error('Error re-verificación:', error);
+    res.status(500).json({ error: 'Error solicitud' }); 
+  }
 });
 
 module.exports = router;
