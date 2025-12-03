@@ -30,7 +30,6 @@ router.get('/pending-stores', async (req, res) => {
 router.get('/store-documents/:localId', async (req, res) => {
   const { localId } = req.params;
   try {
-    // CORRECCIÓN IMPORTANTE: ORDER BY uploaded_at DESC
     const query = `
       SELECT * FROM local_documents 
       WHERE local_id = $1 
@@ -44,29 +43,52 @@ router.get('/store-documents/:localId', async (req, res) => {
 });
 
 // PUT /api/admin/approve-store/:id
-// Aprobar tienda
+// Aprobar tienda Y AL DUEÑO TAMBIÉN (Sincronizado)
 router.put('/approve-store/:id', async (req, res) => {
   const { id } = req.params;
   try {
-    await db.query("UPDATE locales SET verification_status = 'approved', is_active = TRUE, rejection_reason = NULL WHERE local_id = $1", [id]);
-    res.json({ ok: true, message: 'Tienda aprobada' });
+    // 1. Aprobar el Local y obtener el ID del dueño
+    const result = await db.query(
+      "UPDATE locales SET verification_status = 'approved', is_active = TRUE, rejection_reason = NULL WHERE local_id = $1 RETURNING owner_user_id", 
+      [id]
+    );
+    
+    // 2. Si se actualizó la tienda, actualizamos al dueño
+    if (result.rows.length > 0) {
+      const ownerId = result.rows[0].owner_user_id;
+      // Actualizamos al usuario para que vea la pantalla verde
+      await db.query("UPDATE users SET verification_status = 'approved' WHERE firebase_uid = $1", [ownerId]);
+    }
+
+    res.json({ ok: true, message: 'Tienda y usuario aprobados correctamente' });
   } catch (error) {
+    console.error(error);
     res.status(500).json({ error: 'Error al aprobar' });
   }
 });
 
 // PUT /api/admin/reject-store/:id
-// Rechazar tienda con motivo
+// Rechazar tienda Y AL DUEÑO TAMBIÉN (Sincronizado)
 router.put('/reject-store/:id', async (req, res) => {
   const { id } = req.params;
   const { reason } = req.body;
   try {
-    await db.query(
-      "UPDATE locales SET verification_status = 'rejected', is_active = FALSE, rejection_reason = $1 WHERE local_id = $2", 
+    // 1. Rechazar el Local y obtener el ID del dueño
+    const result = await db.query(
+      "UPDATE locales SET verification_status = 'rejected', is_active = FALSE, rejection_reason = $1 WHERE local_id = $2 RETURNING owner_user_id", 
       [reason || 'Documentación incompleta', id]
     );
-    res.json({ ok: true, message: 'Tienda rechazada' });
+
+    // 2. Si se rechazó la tienda, actualizamos al dueño
+    if (result.rows.length > 0) {
+      const ownerId = result.rows[0].owner_user_id;
+      // Actualizamos al usuario para que vea la pantalla roja de corrección
+      await db.query("UPDATE users SET verification_status = 'rejected' WHERE firebase_uid = $1", [ownerId]);
+    }
+
+    res.json({ ok: true, message: 'Tienda rechazada y usuario notificado' });
   } catch (error) {
+    console.error(error);
     res.status(500).json({ error: 'Error al rechazar' });
   }
 });
