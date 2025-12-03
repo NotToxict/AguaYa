@@ -4,16 +4,18 @@ const db = require('../config/db');
 const admin = require('../config/firebase');
 
 // POST /api/auth/sync
-// Sincroniza usuario y devuelve su estado real (incluyendo rechazos)
+// Sincroniza usuario y devuelve su estado real
 router.post('/sync', async (req, res) => {
   const { token } = req.body;
   try {
     const decodedToken = await admin.auth().verifyIdToken(token);
     const { uid, email, name } = decodedToken;
 
-    // Buscamos usuario, estado de tienda y RAZÓN DE RECHAZO
+    // MEJORA: Usamos 'AS' para evitar confusión de nombres entre tablas
     const userQuery = `
-      SELECT u.*, l.verification_status, l.rejection_reason 
+      SELECT u.*, 
+             l.verification_status as store_status, 
+             l.rejection_reason 
       FROM users u
       LEFT JOIN locales l ON u.associated_local_id = l.local_id
       WHERE u.firebase_uid = $1
@@ -24,13 +26,19 @@ router.post('/sync', async (req, res) => {
 
     if (!user) {
       const insertQuery = `
-        INSERT INTO users (firebase_uid, email, name, role, created_at)
-        VALUES ($1, $2, $3, 'client', NOW())
+        INSERT INTO users (firebase_uid, email, name, role, created_at, verification_status)
+        VALUES ($1, $2, $3, 'client', NOW(), 'approved')
         RETURNING *;
       `;
       const insertResult = await db.query(insertQuery, [uid, email, name || 'Usuario']);
       user = insertResult.rows[0];
     }
+
+    // LÓGICA BLINDADA:
+    // Si tiene tienda, mandamos el estado de la tienda (store_status).
+    // Si no tiene tienda, mandamos el del usuario.
+    // Si todo falla, 'approved' por defecto.
+    const finalStatus = user.store_status || user.verification_status || 'approved';
 
     res.json({
       ok: true,
@@ -39,7 +47,7 @@ router.post('/sync', async (req, res) => {
         role: user.role,
         localId: user.associated_local_id,
         name: user.name,
-        verificationStatus: user.verification_status || 'approved',
+        verificationStatus: finalStatus, // <--- Aquí usamos el estado calculado
         rejectionReason: user.rejection_reason 
       }
     });
@@ -50,7 +58,7 @@ router.post('/sync', async (req, res) => {
 });
 
 // POST /api/auth/register-business
-// Registro completo con documentos y ubicación
+// Registro completo
 router.post('/register-business', async (req, res) => {
   const { uid, name, address, phone, lat, lng, documents } = req.body;
   
@@ -59,7 +67,7 @@ router.post('/register-business', async (req, res) => {
   try {
     await client.query('BEGIN');
 
-    // 1. Crear Tienda (Pendiente y Desactivada)
+    // 1. Crear Tienda (Pendiente)
     const localQuery = `
       INSERT INTO locales (
         name, address, phone, owner_user_id, is_active, verification_status,
@@ -71,7 +79,7 @@ router.post('/register-business', async (req, res) => {
     const localRes = await client.query(localQuery, [name, address, phone, uid, lat, lng]);
     const localId = localRes.rows[0].local_id;
 
-    // 2. Actualizar Usuario Y FORZAR ESTADO A PENDING (CORRECCIÓN AQUÍ)
+    // 2. Actualizar Usuario a PENDING
     await client.query(
       `UPDATE users SET role = 'local', associated_local_id = $1, verification_status = 'pending' WHERE firebase_uid = $2`,
       [localId, uid]
@@ -90,7 +98,7 @@ router.post('/register-business', async (req, res) => {
 
   } catch (error) {
     await client.query('ROLLBACK');
-    console.error("Error en registro:", error);
+    console.error("Error registro:", error);
     res.status(500).json({ error: 'No se pudo registrar el negocio' });
   } finally {
     client.release();
