@@ -15,7 +15,7 @@ const deliveryRoutes = require('./routes/deliveryRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const userRoutes = require('./routes/userRoutes');
 const promoRoutes = require('./routes/promoRoutes');
-const supportRoutes = require('./src/routes/supportRoutes');
+const supportRoutes = require('./routes/supportRoutes'); 
 const reviewRoutes = require('./routes/reviewRoutes');
 
 const app = express();
