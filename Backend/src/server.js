@@ -15,6 +15,7 @@ const deliveryRoutes = require('./routes/deliveryRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const userRoutes = require('./routes/userRoutes');
 const promoRoutes = require('./routes/promoRoutes');
+const supportRoutes = require('./src/routes/supportRoutes');
 const reviewRoutes = require('./routes/reviewRoutes');
 
 const app = express();
@@ -41,6 +42,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/promos', promoRoutes);
 app.use('/api/reviews', reviewRoutes);
+app.use('/api/support', supportRoutes);
 
 // --- Iniciar Servidor ---
 app.listen(PORT, () => {
